@@ -1,7 +1,8 @@
 import transformers 
-from transformers import AutoModel, AutoTokenizer
+from transformers import AutoModel, AutoTokenizer, DataCollatorForTokenClassification
 import torch 
 from torch import nn, optim
+from datasets import load_dataset
 from sklearn.metrics import roc_auc_score, precision_recall_fscore_support
 
 import numpy as np 
@@ -17,7 +18,8 @@ import tqdm
 # from utils import classifier, setup_seed, make_if_not_exists
 # from data import prepare_data
 from torch.utils.data import DataLoader
-from utils import setup_seed
+from utils.utils import setup_seed
+from transformers import AutoModelForTokenClassification, TrainingArguments, Trainer
 
 ## use GPU is available 
 if torch.cuda.is_available():
@@ -25,28 +27,72 @@ if torch.cuda.is_available():
 else:
     device = "cpu"
 
-## add arguments 
-parser = argparse.ArgumentParser()
+def hugging_face_model(args):
+    from data import character_level_wnut, tokenize_for_char_manual, tokenize_and_align_labels, tokenize_for_char
+    from utils.compute import compute_metrics
+    model = AutoModelForTokenClassification.from_pretrained(args.model_name, num_labels=14)
+    wnut = load_dataset("wnut_17")
+    wnut_character_level = character_level_wnut(wnut)
 
-parser.add_argument('--dataset', type=str, default='wnut17')
-parser.add_argument('--seed', type=int, default=42)
-parser.add_argument('--log_dir', type=str, default=None)
-parser.add_argument('--output_dir', type=str, default=None)
-parser.add_argument('--bs', type=int, default=16)
-parser.add_argument('--model_name', type=str, default="xlm-roberta-base")
-parser.add_argument('--n_epochs', type=int, default=4)
-parser.add_argument('--lr', type=float, default=1e-4)
-parser.add_argument('--weight_decay', type=float, default=0)
-parser.add_argument('--prefix_space', type=bool, default=False)
-parser.add_argument('--num_labels', type=int, default=14)
+    use_old_tok = ["xlm-roberta-base", "xlm-roberta-large"]
+    use_new_tok = ["google/canine-s"]
+    if args.model_name in use_old_tok:
+        tokenized_wnut = wnut_character_level.map(tokenize_and_align_labels, batched=True)
+    if args.model_name in use_new_tok:
+        try:
+            tokenized_wnut = wnut_character_level.map(tokenize_for_char, batched=True)
+        except:
+            tokenized_wnut = tokenize_for_char_manual(wnut_character_level)
+
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name,
+                                            add_prefix_space=args.prefix_space) ## changed here
+    data_collator = DataCollatorForTokenClassification(tokenizer=tokenizer)
+                                        
+
+    training_args = TrainingArguments(
+        output_dir=args.output_dir,
+        evaluation_strategy="epoch",
+        learning_rate=args.lr,
+        per_device_train_batch_size=args.bs,
+        per_device_eval_batch_size=args.bs,
+        num_train_epochs=args.n_epochs,
+        # weight_decay=0.01,
+    )
+
+    trainer = Trainer(
+        model=model,
+        args=training_args,
+        train_dataset=tokenized_wnut["train"],
+        eval_dataset=tokenized_wnut["test"],
+        tokenizer=tokenizer,
+        data_collator=data_collator,
+        # optimizers = torch.optim.Adam(model.parameters()),
+        compute_metrics = compute_metrics, 
+    )
+
+    trainer.train()
 
 
-args = parser.parse_args()
-prefix_space = args.prefix_space
-model_name = args.model_name
+if __name__ == '__main__':
+    ## add arguments 
+    parser = argparse.ArgumentParser()
 
-def __main__():
+    parser.add_argument('--dataset', type=str, default='wnut17')
+    parser.add_argument('--seed', type=int, default=42)
+    parser.add_argument('--log_dir', type=str, default=None)
+    parser.add_argument('--output_dir', type=str, default=None)
+    parser.add_argument('--bs', type=int, default=16)
+    parser.add_argument('--model_name', type=str, default="xlm-roberta-base")
+    parser.add_argument('--n_epochs', type=int, default=4)
+    parser.add_argument('--lr', type=float, default=1e-4)
+    parser.add_argument('--weight_decay', type=float, default=0)
+    parser.add_argument('--prefix_space', type=bool, default=False)
+    parser.add_argument('--num_labels', type=int, default=14)
+
+    args = parser.parse_args()
+    prefix_space = args.prefix_space
+    model_name = args.model_name
+
     setup_seed(args.seed)
 
-    pass
-
+    hugging_face_model(args)

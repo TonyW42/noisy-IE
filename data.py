@@ -9,7 +9,7 @@ from collections import defaultdict
 from datasets import DatasetDict, Dataset
 from transformers import AutoTokenizer
 
-from run import model_name, prefix_space
+from run import *
 
 ## get raw data 
 def get_unprocessed_data(data_name):
@@ -140,7 +140,7 @@ def tokenize_wnut_char(model_name):
     assert is_aligned(tokenized_wnut)
     return tokenized_wnut
 
-a = tokenize_wnut_char("xlm-roberta-large")
+# a = tokenize_wnut_char("xlm-roberta-large")
 # print(a["train"][0])
 # print(len(a["train"][0]["input_ids"]))
 # print(len(a["train"][0]["attention_mask"]))
