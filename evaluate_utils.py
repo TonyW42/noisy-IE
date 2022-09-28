@@ -3,6 +3,7 @@ import torch
 import evaluate 
 import statistics
 import math
+from utils.utils import mode, multimode 
 # from run import *  
 
 def get_space_id(model_name):
@@ -124,6 +125,44 @@ def wnut_char_to_word_first_letter(char_pred):
       "label" : label
   }
 
+def wnut_char_rule_1(l):
+  return mode(l) ## if equally likely, then take the first one 
+
+## if contains B, then B. Then take
+def wnut_char_rule_2(l):
+  B_list = [1, 3, 5, 7, 9, 11]
+  I_2_B = {0:0, 2:1, 4:3, 6:5, 8:7, 10:9, 12:11, 1:1, 3:3, 5:5, 7:7, 9:9, 11:11}
+  if len(l) == 1: return l[0]
+  if l[0] in B_list:
+    mode_l = mode(l[1:len(l)])
+    label = I_2_B[mode_l]
+  else:
+    label = mode(l)
+  return label
+
+def wnut_char_to_word_rule(char_pred, rule = 1):
+  pred_word, label_word, input_word = char_pred["pred_word"], char_pred["label_word"], char_pred["input_word"]
+  label = []
+  pred = []
+  for i in range(0, len(pred_word)):
+    p = pred_word[i]
+    l = label_word[i]
+    pred_rule = None
+    if rule == 1:
+      pred_rule = wnut_char_rule_1(p)
+    if rule == 2: 
+      pred_rule = wnut_char_rule_2(p)
+      
+
+    pred.append(pred_rule)
+    label.append(l[0])
+  return {
+      "pred" : pred, 
+      "label" : label
+  }
+# c_rule_1 = char_to_word_rule(b, rule = 1)
+# c_rule_2 = char_to_word_rule(b, rule = 2)
+
 def wnut_f1(pred, ref, average = "macro"):
   f1_metric = evaluate.load("f1")
   return f1_metric.compute(predictions = pred, references = ref, 
@@ -135,6 +174,10 @@ def wnut_evaluate_f1(model, tokenized_wnut, prefix_space, model_name, device, me
   pred = None
   if method == "first letter":
     pred = wnut_char_to_word_first_letter(pred_for_char)
+  if method == "rule 1":
+    pred = wnut_char_to_word_rule(pred_for_char, rule = 1)
+  if method == "rule 2":
+    pred = wnut_char_to_word_rule(pred_for_char, rule = 2)
   wnut_f1_score = wnut_f1(pred = pred["pred"], ref = pred["label"])
   return wnut_f1_score
   

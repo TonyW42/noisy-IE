@@ -30,7 +30,8 @@ else:
 def hugging_face_model(args):
     from data import character_level_wnut, tokenize_for_char_manual, tokenize_and_align_labels, tokenize_for_char
     from utils.compute import compute_metrics
-    model = AutoModelForTokenClassification.from_pretrained(args.model_name, num_labels=14)
+    model = AutoModelForTokenClassification.from_pretrained(args.model_name, 
+            num_labels=args.num_labels)
     wnut = load_dataset("wnut_17")
     wnut_character_level = character_level_wnut(wnut)
 
@@ -77,8 +78,23 @@ def hugging_face_model(args):
                                tokenized_wnut = tokenized_wnut, 
                                prefix_space = args.prefix_space, 
                                model_name = args.model_name,
-                               device = device)
+                               device = device,
+                               method = "first letter")
+    wnut_f1_1 = wnut_evaluate_f1(model = model,  
+                                 tokenized_wnut = tokenized_wnut, 
+                                 prefix_space = args.prefix_space, 
+                                 model_name = args.model_name,
+                                 device = device,
+                                 method = "rule 1")
+    wnut_f1_2 = wnut_evaluate_f1(model = model,  
+                                 tokenized_wnut = tokenized_wnut, 
+                                 prefix_space = args.prefix_space, 
+                                 model_name = args.model_name,
+                                 device = device,
+                                 method = "rule 2")
     print(f"\n The F1-score of the model is {wnut_f1} \n")
+    print(f"\n The F1-score of the model is {wnut_f1_1} \n")
+    print(f"\n The F1-score of the model is {wnut_f1_2} \n")
 
     
 
@@ -94,7 +110,7 @@ parser.add_argument('--n_epochs', type=int, default=1) ## change to 4
 parser.add_argument('--lr', type=float, default=1e-4)
 parser.add_argument('--weight_decay', type=float, default=0)
 parser.add_argument('--prefix_space', type=bool, default=True)
-parser.add_argument('--num_labels', type=int, default=14)
+parser.add_argument('--num_labels', type=int, default=13)
 
 args = parser.parse_args()
 prefix_space = args.prefix_space
