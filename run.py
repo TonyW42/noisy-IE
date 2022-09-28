@@ -71,7 +71,7 @@ def hugging_face_model(args):
         compute_metrics = compute_metrics, 
     )
 
-    # trainer.train()
+    trainer.train()
 
     ## evalate trained model 
     wnut_f1 = wnut_evaluate_f1(model = model,  
@@ -80,21 +80,21 @@ def hugging_face_model(args):
                                model_name = args.model_name,
                                device = device,
                                method = "first letter")
-    wnut_f1_1 = wnut_evaluate_f1(model = model,  
-                                 tokenized_wnut = tokenized_wnut, 
-                                 prefix_space = args.prefix_space, 
-                                 model_name = args.model_name,
-                                 device = device,
-                                 method = "rule 1")
-    wnut_f1_2 = wnut_evaluate_f1(model = model,  
-                                 tokenized_wnut = tokenized_wnut, 
-                                 prefix_space = args.prefix_space, 
-                                 model_name = args.model_name,
-                                 device = device,
-                                 method = "rule 2")
+    # wnut_f1_1 = wnut_evaluate_f1(model = model,  
+    #                              tokenized_wnut = tokenized_wnut, 
+    #                              prefix_space = args.prefix_space, 
+    #                              model_name = args.model_name,
+    #                              device = device,
+    #                              method = "rule 1")
+    # wnut_f1_2 = wnut_evaluate_f1(model = model,  
+    #                              tokenized_wnut = tokenized_wnut, 
+    #                              prefix_space = args.prefix_space, 
+    #                              model_name = args.model_name,
+    #                              device = device,
+    #                              method = "rule 2")
     print(f"\n The F1-score of the model is {wnut_f1} \n")
-    print(f"\n The F1-score of the model is {wnut_f1_1} \n")
-    print(f"\n The F1-score of the model is {wnut_f1_2} \n")
+    # print(f"\n The F1-score of the model is {wnut_f1_1} \n")
+    # print(f"\n The F1-score of the model is {wnut_f1_2} \n")
 
     
 
