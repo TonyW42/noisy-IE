@@ -20,7 +20,7 @@ import tqdm
 from torch.utils.data import DataLoader
 from utils.utils import setup_seed
 from transformers import AutoModelForTokenClassification, TrainingArguments, Trainer
-
+from evaluate_utils import *
 ## use GPU is available 
 if torch.cuda.is_available():
     device = "cuda"
@@ -50,7 +50,7 @@ def hugging_face_model(args):
                                         
 
     training_args = TrainingArguments(
-        output_dir=args.output_dir,
+        output_dir=args.output_dir, ## come back to fix this!
         evaluation_strategy="epoch",
         learning_rate=args.lr,
         per_device_train_batch_size=args.bs,
@@ -70,28 +70,55 @@ def hugging_face_model(args):
         compute_metrics = compute_metrics, 
     )
 
-    trainer.train()
+    # trainer.train()
 
+    ## evalate trained model 
+    wnut_f1 = wnut_evaluate_f1(model = model,  
+                               tokenized_wnut = tokenized_wnut, 
+                               prefix_space = args.prefix_space, 
+                               model_name = args.model_name,
+                               device = device)
+    print(f"\n The F1-score of the model is {wnut_f1} \n")
+
+    
+
+parser = argparse.ArgumentParser()
+
+parser.add_argument('--dataset', type=str, default='wnut17')
+parser.add_argument('--seed', type=int, default=42)
+parser.add_argument('--log_dir', type=str, default=None)
+parser.add_argument('--output_dir', type=str, default="./results")
+parser.add_argument('--bs', type=int, default=16)
+parser.add_argument('--model_name', type=str, default="google/canine-s")
+parser.add_argument('--n_epochs', type=int, default=1) ## change to 4
+parser.add_argument('--lr', type=float, default=1e-4)
+parser.add_argument('--weight_decay', type=float, default=0)
+parser.add_argument('--prefix_space', type=bool, default=True)
+parser.add_argument('--num_labels', type=int, default=14)
+
+args = parser.parse_args()
+prefix_space = args.prefix_space
+model_name = args.model_name
 
 if __name__ == '__main__':
     ## add arguments 
-    parser = argparse.ArgumentParser()
+    # parser = argparse.ArgumentParser()
 
-    parser.add_argument('--dataset', type=str, default='wnut17')
-    parser.add_argument('--seed', type=int, default=42)
-    parser.add_argument('--log_dir', type=str, default=None)
-    parser.add_argument('--output_dir', type=str, default=None)
-    parser.add_argument('--bs', type=int, default=16)
-    parser.add_argument('--model_name', type=str, default="xlm-roberta-base")
-    parser.add_argument('--n_epochs', type=int, default=4)
-    parser.add_argument('--lr', type=float, default=1e-4)
-    parser.add_argument('--weight_decay', type=float, default=0)
-    parser.add_argument('--prefix_space', type=bool, default=False)
-    parser.add_argument('--num_labels', type=int, default=14)
+    # parser.add_argument('--dataset', type=str, default='wnut17')
+    # parser.add_argument('--seed', type=int, default=42)
+    # parser.add_argument('--log_dir', type=str, default=None)
+    # parser.add_argument('--output_dir', type=str, default=None)
+    # parser.add_argument('--bs', type=int, default=16)
+    # parser.add_argument('--model_name', type=str, default="xlm-roberta-base")
+    # parser.add_argument('--n_epochs', type=int, default=4)
+    # parser.add_argument('--lr', type=float, default=1e-4)
+    # parser.add_argument('--weight_decay', type=float, default=0)
+    # parser.add_argument('--prefix_space', type=bool, default=False)
+    # parser.add_argument('--num_labels', type=int, default=14)
 
-    args = parser.parse_args()
-    prefix_space = args.prefix_space
-    model_name = args.model_name
+    # args = parser.parse_args()
+    # prefix_space = args.prefix_space
+    # model_name = args.model_name
 
     setup_seed(args.seed)
 

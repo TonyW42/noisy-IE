@@ -54,6 +54,7 @@ def get_tokenizer(model_name, prefix_space):
     return tokenizer
 
 tokenizer = get_tokenizer(model_name, prefix_space)
+# print(tokenizer(" "))
 
 def tokenize_and_align_labels(examples):
     tokenized_inputs = tokenizer(examples["tokens"], truncation=True, is_split_into_words=True)
@@ -140,7 +141,9 @@ def tokenize_wnut_char(model_name):
     assert is_aligned(tokenized_wnut)
     return tokenized_wnut
 
-# a = tokenize_wnut_char("xlm-roberta-large")
+a = tokenize_wnut_char("google/canine-s")
+print(a["train"][0]["input_ids"])
+print(a["train"][0]["labels"])
 # print(a["train"][0])
 # print(len(a["train"][0]["input_ids"]))
 # print(len(a["train"][0]["attention_mask"]))

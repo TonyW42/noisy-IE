@@ -1,0 +1,142 @@
+import numpy as np 
+import torch 
+import evaluate 
+import statistics
+import math
+# from run import *  
+
+def get_space_id(model_name):
+  space_id = None
+  if model_name == "google/canine-s":
+      space_id = 32
+  return space_id 
+
+
+
+def wnut_get_predictions(model, tokenized_wnut, prefix_space, device):
+  model.eval()
+
+  predicted = []
+  label = []
+  count = 0
+  len_test = len(tokenized_wnut["test"])
+  input_ids_list = []
+  for samp in tokenized_wnut["test"]:
+    input_ids = samp["input_ids"]
+    attn_mask = samp["attention_mask"]
+    labels = samp["labels"]
+
+    input_ids = torch.unsqueeze(torch.tensor(input_ids), dim=0).to(device)
+    attn_mask = torch.unsqueeze(torch.tensor(attn_mask), dim = 0).to(device)
+    input_ids_squeezed = input_ids.view(-1)
+
+    encoded = model(input_ids = input_ids,
+                    attention_mask = attn_mask)
+    
+    pred = torch.argmax(encoded["logits"], dim = 2)
+    pred = pred.view(-1)
+    if prefix_space: ## added, remove trailing space
+      pred = pred[1:(len(pred) - 1)] 
+      input_ids_squeezed = input_ids_squeezed[1: (len(input_ids_squeezed) - 1)]
+      labels = labels[1:(len(labels)-1)]
+
+    predicted.append(pred)
+    label.append(labels)
+    input_ids_list.append(input_ids_squeezed)
+    # print(pred)
+    # metric.add_batch(predictions=pred, 
+    #                  references=torch.tensor(labels))
+    assert len(pred) == len(labels) & len(pred) == len(input_ids_squeezed) & len(labels) == len(input_ids_squeezed)
+
+    if count % 200 == 0:
+      print(f"finish {count} / {len_test}")
+      # break 
+    #   return {
+    #     "pred" : predicted,
+    #     "label": label,
+    #     "input_ids": input_ids_list
+    # }
+    count += 1
+  len_test = len(tokenized_wnut["test"])
+  print(f"Finished {len_test}/{len_test}")
+
+  return {
+      "pred" : predicted,
+      "label": label,
+      "input_ids": input_ids_list
+  }
+
+def wnut_separate_char_prediction(pred_output, model_name):
+  pred, label, input_ids = pred_output["pred"], pred_output["label"], pred_output["input_ids"]
+  pred_word = []
+  label_word = []
+  ids_word = []
+  space_id = get_space_id(model_name) ## get space id 
+  for i in range(0, len(pred)):
+    p = pred[i]
+    l = label[i]
+    tok_id = input_ids[i]
+    tmp_pred = []
+    tmp_label = []
+    tmp_input = []
+    for j in range(0, len(p)):
+      p_j = int(p[j])
+      l_j = int(l[j])
+      tok_id_j = int(tok_id[j])
+      # print(tok_id_j)
+      if tok_id_j == space_id:
+        if len(tmp_pred) != 0: 
+          pred_word.append(tmp_pred)
+          label_word.append(tmp_label)
+          ids_word.append(tmp_input)
+        tmp_pred = []
+        tmp_label = []
+        tmp_input = []
+      else:
+        tmp_pred.append(p_j)
+        tmp_label.append(l_j)
+        tmp_input.append(tok_id_j)
+    # print(ids_word)
+  return {
+      "pred_word"  :  pred_word, 
+      "label_word" : label_word, 
+      "input_word" : ids_word,
+  }
+
+def wnut_char_to_word_first_letter(char_pred):
+  pred_word, label_word, input_word = char_pred["pred_word"], char_pred["label_word"], char_pred["input_word"]
+
+  label = []
+  inputs = []
+  pred = []
+  for i in range(0, len(pred_word)):
+    p = pred_word[i]
+    input_i = input_word[i]
+    l = label_word[i]
+
+    pred.append(p[0])
+    inputs.append(input_i[0])
+    label.append(l[0])
+  
+  return {
+      "pred" : pred, 
+      "word": inputs,
+      "label" : label
+  }
+
+def wnut_f1(pred, ref, average = "macro"):
+  f1_metric = evaluate.load("f1")
+  return f1_metric.compute(predictions = pred, references = ref, 
+                           average = average)
+
+def wnut_evaluate_f1(model, tokenized_wnut, prefix_space, model_name, device, method = "first letter"):
+  raw_predictions = wnut_get_predictions(model, tokenized_wnut, prefix_space, device)
+  pred_for_char = wnut_separate_char_prediction(raw_predictions, model_name)
+  pred = None
+  if method == "first letter":
+    pred = wnut_char_to_word_first_letter(pred_for_char)
+  wnut_f1_score = wnut_f1(pred = pred["pred"], ref = pred["label"])
+  return wnut_f1_score
+  
+
+
