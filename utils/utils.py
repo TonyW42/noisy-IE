@@ -78,3 +78,10 @@ def multimode(data):
     maxcount, mode_items = next(groupby(counts, key=itemgetter(1)), (0, []))
     return list(map(itemgetter(0), mode_items))
 #################################################################
+def flatten_2d(L):
+    new = []
+    for l in L:
+        for l_i in l:
+            new.append(l_i)
+    return new
+
