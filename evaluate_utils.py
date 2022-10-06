@@ -344,6 +344,7 @@ def wnut_get_subword_logits(model, tokenized_wnut, prefix_space, device, model_n
     count += 1
   len_test = len(tokenized_wnut["test"])
   print(f"Finished {len_test}/{len_test}")
+  print(len(flatten_2d(predicted)))
 
   return {
       "pred" : flatten_2d(predicted),
