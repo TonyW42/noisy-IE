@@ -73,7 +73,7 @@ class HuggingFaceModel:
                 logits_tmp = pred_tmp["pred"]
                 label = pred_tmp["label"]
                 self.log.info("-------- granularity == character ---------")
-                self.log.info("(%d, %d)", (len(logits_tmp), len(logits_tmp[0])))
+                self.log.info("logits size: (%d, %d)", len(logits_tmp), len(logits_tmp[0]))
             elif granularity == "subword 30k" or granularity  == "subword 50k":
                 ## get subword logits 
                 pred_tmp = wnut_get_subword_logits(model = model,  
@@ -85,7 +85,7 @@ class HuggingFaceModel:
                 logits_tmp = pred_tmp["pred"]
                 label = pred_tmp["label"]
                 self.log.info("-------- granularity == subword ---------")
-                self.log.info("(%d, %d)", (len(logits_tmp), len(logits_tmp[0])))
+                self.log.info("logits size: (%d, %d)", len(logits_tmp), len(logits_tmp[0]))
             if count == 0:
                 # logits_sum = np.array([s.detach().numpy() for s in logits_tmp])
                 logits_sum = torch.tensor([s.detach().numpy() for s in logits_tmp])
