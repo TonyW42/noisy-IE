@@ -287,7 +287,7 @@ def wnut_separate_char_logits(pred_output, model_name):
       "input_word" : ids_word,
   }
 
-def wnut_get_char_logits(model, tokenized_wnut, prefix_space, device, model_name, rule = 3):
+def wnut_get_char_logits(model, tokenized_wnut, prefix_space, device, model_name, rule=3):
   logits_raw = wnut_get_character_logits_raw(model, tokenized_wnut, prefix_space, device)
   logits_grouped = wnut_separate_char_logits(logits_raw, model_name)
   logits_word = wnut_char_to_word_rule(logits_grouped, rule = rule)
@@ -296,7 +296,7 @@ def wnut_get_char_logits(model, tokenized_wnut, prefix_space, device, model_name
 #####################################################################
 ####### compute subword level logits 
 #####################################################################
-def wnut_get_subword_logits(model, tokenized_wnut, prefix_space, device):
+def wnut_get_subword_logits(model, tokenized_wnut, prefix_space, device, model_name, rule=3):
   model.eval()
 
   predicted = []
