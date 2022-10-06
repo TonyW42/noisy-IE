@@ -10,11 +10,13 @@ import argparse
 import torch 
 from evaluate_utils import *
 import numpy as np
+from utils.log import *
 
 
 class HuggingFaceModel:
     def __init__(self, args):
         self.args = args
+        self.log = Log("Hugging Face Model")
 
     def train(self):
         model = AutoModelForTokenClassification.from_pretrained(self.args.model_name, num_labels=self.args.num_labels)
@@ -28,7 +30,7 @@ class HuggingFaceModel:
                 tok = Tokenization(self.args.granularities_model[granularity], self.args.prefix_space)
                 tokenized_wnut = tok.tokenize_for_char_manual(wnut_character_level)
             elif granularity == "subword 50k" or granularity == "subword 30k":
-                print(self.args.granularities_model[granularity])
+                self.log.info(self.args.granularities_model[granularity])
                 tok = Tokenization(self.args.granularities_model[granularity], self.args.prefix_space)
                 tokenized_wnut = wnut.map(tok.tokenize_and_align_labels, batched=True) ## was previously wnut_character level 
             assert is_aligned(tokenized_wnut)
@@ -70,9 +72,8 @@ class HuggingFaceModel:
                                                 rule = 3)
                 logits_tmp = pred_tmp["pred"]
                 label = pred_tmp["label"]
-                print("-------- granularity == character ---------")
-                print(len(logits_tmp), len(logits_tmp[0]))
-                print(len(label))
+                self.log.info("-------- granularity == character ---------")
+                self.log.info("(%d, %d)", (len(logits_tmp), len(logits_tmp[0])))
             elif granularity == "subword 30k" or granularity  == "subword 50k":
                 ## get subword logits 
                 pred_tmp = wnut_get_subword_logits(model = model,  
@@ -83,9 +84,8 @@ class HuggingFaceModel:
                                                 rule = 3)
                 logits_tmp = pred_tmp["pred"]
                 label = pred_tmp["label"]
-                print("-------- granularity == subword ---------")
-                print(len(logits_tmp), len(logits_tmp[0]))
-                print(len(label))
+                self.log.info("-------- granularity == subword ---------")
+                self.log.info("(%d, %d)", (len(logits_tmp), len(logits_tmp[0])))
             if count == 0:
                 # logits_sum = np.array([s.detach().numpy() for s in logits_tmp])
                 logits_sum = torch.tensor([s.detach().numpy() for s in logits_tmp])
@@ -98,7 +98,7 @@ class HuggingFaceModel:
         # logits_sum = torch.tensor(logits_sum)
         pred = torch.argmax(logits_sum, dim = 1)
         ensumble_f1 = wnut_f1(pred = pred, ref = label)
-        print(f"\n The F1-score of the model is {ensumble_f1} \n")
+        self.log.info(f"\n The F1-score of the model is {ensumble_f1} \n")
 
             
         # ## evalate trained model 
