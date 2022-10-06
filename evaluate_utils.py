@@ -354,7 +354,7 @@ def wnut_get_subword_logits(model, tokenized_wnut, prefix_space, device, model_n
   label = [label_all[i] for i in range(0, len(label_all)) if i not in null_indices]
   input_ids = [input_ids_all[i] for i in range(0, len(label_all)) if i not in null_indices]
   assert len(predicted) == len(label) & len(input_ids) == len(predicted)
-  
+  print(len(predicted))
   return {
       "pred" : predicted,
       "label": label,
