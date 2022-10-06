@@ -344,11 +344,20 @@ def wnut_get_subword_logits(model, tokenized_wnut, prefix_space, device, model_n
     count += 1
   len_test = len(tokenized_wnut["test"])
   print(f"Finished {len_test}/{len_test}")
-  print(len(flatten_2d(predicted)))
 
+  predicted_all = flatten_2d(predicted)
+  label_all = flatten_2d(label)
+  input_ids_all = flatten_2d(input_ids_list)
+  null_indices = [i for i in range(0, len(label_all)) if label_all[i] == -100]
+
+  predicted = [predicted_all[i] for i in range(0, len(label_all)) if i not in null_indices]
+  label = [label_all[i] for i in range(0, len(label_all)) if i not in null_indices]
+  input_ids = [input_ids_all[i] for i in range(0, len(label_all)) if i not in null_indices]
+  assert len(predicted) == len(label) & len(input_ids) == len(predicted)
+  
   return {
-      "pred" : flatten_2d(predicted),
-      "label": flatten_2d(label),
-      "input_ids": flatten_2d(input_ids_list)
+      "pred" : predicted,
+      "label": label,
+      "input_ids": input_ids_list
   }
   
