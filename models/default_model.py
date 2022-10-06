@@ -27,8 +27,9 @@ class HuggingFaceModel:
                 tok = Tokenization(self.args.granularities_model[granularity], self.args.prefix_space)
                 tokenized_wnut = tok.tokenize_for_char_manual(wnut_character_level)
             elif granularity == "subword 50k" or granularity == "subword 30k":
+                print(self.args.granularities_model[granularity])
                 tok = Tokenization(self.args.granularities_model[granularity], self.args.prefix_space)
-                tokenized_wnut = wnut_character_level.map(tok.tokenize_and_align_labels, batched=True)
+                tokenized_wnut = wnut.map(tok.tokenize_and_align_labels, batched=True) ## was previously wnut_character level 
             assert is_aligned(tokenized_wnut)
 
             model_name = self.args.granularities_model[granularity]
