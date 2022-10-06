@@ -15,6 +15,18 @@ import tqdm
 
 from datasets import load_dataset
 
+import math
+import numbers
+import random
+
+from fractions import Fraction
+from decimal import Decimal
+from itertools import groupby, repeat
+from bisect import bisect_left, bisect_right
+from math import hypot, sqrt, fabs, exp, erf, tau, log, fsum
+from operator import itemgetter
+from collections import Counter, namedtuple
+
 ## set seed 
 def setup_seed(seed):
     torch.manual_seed(seed)
@@ -32,17 +44,6 @@ def make_if_not_exists(new_dir):
 #################################################################
 ####  find mode
 #############################
-import math
-import numbers
-import random
-
-from fractions import Fraction
-from decimal import Decimal
-from itertools import groupby, repeat
-from bisect import bisect_left, bisect_right
-from math import hypot, sqrt, fabs, exp, erf, tau, log, fsum
-from operator import itemgetter
-from collections import Counter, namedtuple
 def mode(data):
     """Return the most common data point from discrete or nominal data.
     ``mode`` assumes discrete data, and returns a single value. This is the
@@ -63,6 +64,8 @@ def mode(data):
         return pairs[0][0]
     except IndexError:
         raise RuntimeError('no mode for empty data') from None
+
+
 def multimode(data):
     """Return a list of the most frequently occurring values.
     Will return more than one result if there are multiple modes
@@ -78,6 +81,8 @@ def multimode(data):
     maxcount, mode_items = next(groupby(counts, key=itemgetter(1)), (0, []))
     return list(map(itemgetter(0), mode_items))
 #################################################################
+
+
 def flatten_2d(L):
     new = []
     for l in L:

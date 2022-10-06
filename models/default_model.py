@@ -9,6 +9,7 @@ from datasets import load_dataset
 import argparse
 import torch 
 from evaluate_utils import *
+import numpy as np
 
 
 class HuggingFaceModel:
@@ -86,13 +87,15 @@ class HuggingFaceModel:
                 print(len(logits_tmp), len(logits_tmp[0]))
                 print(len(label))
             if count == 0:
-                logits_sum = logits_tmp
+                # logits_sum = np.array([s.detach().numpy() for s in logits_tmp])
+                logits_sum = torch.tensor([s.detach().numpy() for s in logits_tmp])
             if count > 0:
-                logits_sum += logits_tmp 
+                # logits_sum += np.array([s.detach().numpy() for s in logits_tmp]) 
+                logits_sum = torch.add(logits_sum, torch.tensor([s.detach().numpy() for s in logits_tmp]))
             count += 1
 
-        logits_sum = [s.tolist() for s in logits_sum]
-        logits_sum = torch.tensor(logits_sum)
+        # logits_sum = [s.tolist() for s in logits_sum]
+        # logits_sum = torch.tensor(logits_sum)
         pred = torch.argmax(logits_sum, dim = 1)
         ensumble_f1 = wnut_f1(pred = pred, ref = label)
         print(f"\n The F1-score of the model is {ensumble_f1} \n")
