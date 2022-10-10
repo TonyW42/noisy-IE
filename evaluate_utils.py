@@ -241,8 +241,8 @@ def wnut_get_character_logits_raw(model, tokenized_wnut, prefix_space, device):
       #     "input_ids": input_ids_list
       # }
       count += 1
-    len_test = len(tokenized_wnut["test"])
-    print(f"Finished {len_test}/{len_test}")
+  len_test = len(tokenized_wnut["test"])
+  print(f"Finished {len_test}/{len_test}")
 
   return {
       "pred" : predicted,
