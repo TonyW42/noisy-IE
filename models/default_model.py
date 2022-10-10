@@ -29,7 +29,7 @@ class HuggingFaceModel:
                 wnut_character_level = clm.character_level_wnut(wnut)
                 tok = Tokenization(self.args.granularities_model[granularity], self.args.prefix_space)
                 tokenized_wnut = tok.tokenize_for_char_manual(wnut_character_level)
-            elif granularity == "subword 50k" or granularity == "subword 30k":
+            elif granularity == "subword_50k" or granularity == "subword_30k":
                 self.log.info(self.args.granularities_model[granularity])
                 tok = Tokenization(self.args.granularities_model[granularity], self.args.prefix_space)
                 tokenized_wnut = wnut.map(tok.tokenize_and_align_labels, batched=True) ## was previously wnut_character level 
@@ -75,7 +75,7 @@ class HuggingFaceModel:
                 label = pred_tmp["label"]
                 self.log.info("-------- granularity == character ---------")
                 self.log.info("logits size: (%d, %d)", len(logits_tmp), len(logits_tmp[0]))
-            elif granularity == "subword 30k" or granularity  == "subword 50k":
+            elif granularity == "subword_30k" or granularity  == "subword_50k":
                 ## get subword logits 
                 pred_tmp = wnut_get_subword_logits(model = model,  
                                                 tokenized_wnut = tokenized_wnut, 
