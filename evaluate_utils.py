@@ -224,9 +224,9 @@ def wnut_get_character_logits_raw(model, tokenized_wnut, prefix_space, device):
         labels = labels[1:(len(labels)-1)]
       
       pred = torch.nn.functional.softmax(pred, dim = 1) ## computes probability
-      predicted.append(pred.detach().numpy())
+      predicted.append(pred.detach().cpu().numpy())
       label.append(labels)
-      input_ids_list.append(input_ids_squeezed.detach().numpy())
+      input_ids_list.append(input_ids_squeezed.detach().cpu().numpy())
       # print(pred)
       # metric.add_batch(predictions=pred, 
       #                  references=torch.tensor(labels))
@@ -327,9 +327,9 @@ def wnut_get_subword_logits(model, tokenized_wnut, prefix_space, device, model_n
       
       pred = torch.nn.functional.softmax(pred, dim = 1) ## computes probability
 
-      predicted.append(pred.detach().numpy())
+      predicted.append(pred.detach().cpu().numpy())
       label.append(labels)
-      input_ids_list.append(input_ids_squeezed.detach().numpy())
+      input_ids_list.append(input_ids_squeezed.detach().cpu().numpy())
       # print(pred)
       # metric.add_batch(predictions=pred, 
       #                  references=torch.tensor(labels))
