@@ -46,7 +46,7 @@ if __name__ == '__main__':
     parser.add_argument('--granularities', type=str, default="character,subword 50k")# add cahracter
     parser.add_argument('--add_space_for_char', type=bool, default=True)
     parser.add_argument('--to_char_method', type=str, default="inherit")
-    parser.add_argument('--train', type=bool, default=False)
+    parser.add_argument('--train', type=str, default="True")
     parser.add_argument('--device', type=str, default=None)
 
     parser.add_argument('--granularities_model', type=dict, 
@@ -56,6 +56,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     args.granularities = args.granularities.split(",")
+    args.train = True if args.train == "True" else False
     
     if not args.device:
         if torch.cuda.is_available():
