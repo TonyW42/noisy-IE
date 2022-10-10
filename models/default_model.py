@@ -98,6 +98,7 @@ class HuggingFaceModel:
         # logits_sum = torch.tensor(logits_sum)
         pred = torch.argmax(logits_sum, dim = 1)
         ensumble_f1 = wnut_f1(pred = pred, ref = label)
+        print(f"\n The F1-score of the model is {ensumble_f1} \n")
         self.log.info(f"\n The F1-score of the model is {ensumble_f1} \n")
 
             
