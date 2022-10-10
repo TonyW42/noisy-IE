@@ -43,7 +43,7 @@ if __name__ == '__main__':
     parser.add_argument('--weight_decay', type=float, default=0)
     parser.add_argument('--prefix_space', type=bool, default=True)
     parser.add_argument('--num_labels', type=int, default=13)
-    parser.add_argument('--granularities', type=str, default="character,subword 50k")# add cahracter
+    parser.add_argument('--granularities', type=str, default="character,subword_50k")# add cahracter
     parser.add_argument('--add_space_for_char', type=bool, default=True)
     parser.add_argument('--to_char_method', type=str, default="inherit")
     parser.add_argument('--train', type=str, default="True")
@@ -51,8 +51,8 @@ if __name__ == '__main__':
 
     parser.add_argument('--granularities_model', type=dict, 
                         default= {"character": "google/canine-s",
-                                "subword 50k": "xlm-roberta-base",
-                                "subword 30k" : "bert-base-cased"})
+                                "subword_50k": "xlm-roberta-base",
+                                "subword_30k" : "bert-base-cased"})
 
     args = parser.parse_args()
     args.granularities = args.granularities.split(",")
