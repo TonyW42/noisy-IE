@@ -306,43 +306,44 @@ def wnut_get_subword_logits(model, tokenized_wnut, prefix_space, device, model_n
   len_test = len(tokenized_wnut["test"])
   input_ids_list = []
   for samp in tokenized_wnut["test"]:
-    input_ids = samp["input_ids"]
-    attn_mask = samp["attention_mask"]
-    labels = samp["labels"]
+    with torch.no_grad():
+      input_ids = samp["input_ids"]
+      attn_mask = samp["attention_mask"]
+      labels = samp["labels"]
 
-    input_ids = torch.unsqueeze(torch.tensor(input_ids), dim=0).to(device)
-    attn_mask = torch.unsqueeze(torch.tensor(attn_mask), dim = 0).to(device)
-    input_ids_squeezed = input_ids.view(-1)
+      input_ids = torch.unsqueeze(torch.tensor(input_ids), dim=0).to(device)
+      attn_mask = torch.unsqueeze(torch.tensor(attn_mask), dim = 0).to(device)
+      input_ids_squeezed = input_ids.view(-1)
 
-    encoded = model(input_ids = input_ids,
-                    attention_mask = attn_mask)
-    
-    pred = encoded["logits"]
-    pred = torch.squeeze(pred)
-    if prefix_space: ## added, remove trailing space
-      pred = pred[1:(len(pred) - 1)] 
-      input_ids_squeezed = input_ids_squeezed[1: (len(input_ids_squeezed) - 1)]
-      labels = labels[1:(len(labels)-1)]
-    
-    pred = torch.nn.functional.softmax(pred, dim = 1) ## computes probability
+      encoded = model(input_ids = input_ids,
+                      attention_mask = attn_mask)
+      
+      pred = encoded["logits"]
+      pred = torch.squeeze(pred)
+      if prefix_space: ## added, remove trailing space
+        pred = pred[1:(len(pred) - 1)] 
+        input_ids_squeezed = input_ids_squeezed[1: (len(input_ids_squeezed) - 1)]
+        labels = labels[1:(len(labels)-1)]
+      
+      pred = torch.nn.functional.softmax(pred, dim = 1) ## computes probability
 
-    predicted.append(pred)
-    label.append(labels)
-    input_ids_list.append(input_ids_squeezed)
-    # print(pred)
-    # metric.add_batch(predictions=pred, 
-    #                  references=torch.tensor(labels))
-    assert len(pred) == len(labels) & len(pred) == len(input_ids_squeezed) & len(labels) == len(input_ids_squeezed)
+      predicted.append(pred.detach().numpy())
+      label.append(labels)
+      input_ids_list.append(input_ids_squeezed.detach().numpy())
+      # print(pred)
+      # metric.add_batch(predictions=pred, 
+      #                  references=torch.tensor(labels))
+      assert len(pred) == len(labels) & len(pred) == len(input_ids_squeezed) & len(labels) == len(input_ids_squeezed)
 
-    if count % 200 == 0:
-      print(f"finish {count} / {len_test}")
-      # break 
-    #   return {
-    #     "pred" : predicted,
-    #     "label": label,
-    #     "input_ids": input_ids_list
-    # }
-    count += 1
+      if count % 200 == 0:
+        print(f"finish {count} / {len_test}")
+        # break 
+      #   return {
+      #     "pred" : predicted,
+      #     "label": label,
+      #     "input_ids": input_ids_list
+      # }
+      count += 1
   len_test = len(tokenized_wnut["test"])
   print(f"Finished {len_test}/{len_test}")
 
