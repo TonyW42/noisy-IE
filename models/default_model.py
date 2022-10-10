@@ -19,7 +19,7 @@ class HuggingFaceModel:
         self.log = Log("Hugging Face Model")
 
     def train(self):
-        model = AutoModelForTokenClassification.from_pretrained(self.args.model_name, num_labels=self.args.num_labels)
+        # model = AutoModelForTokenClassification.from_pretrained(self.args.model_name, num_labels=self.args.num_labels)
         wnut = load_dataset("wnut_17")
         logits_sum = []
         count = 0
@@ -36,6 +36,7 @@ class HuggingFaceModel:
             assert is_aligned(tokenized_wnut)
 
             model_name = self.args.granularities_model[granularity]
+            model = AutoModelForTokenClassification.from_pretrained(model_name, num_labels=self.args.num_labels)
             tokenizer = AutoTokenizer.from_pretrained(model_name, add_prefix_space=self.args.prefix_space) ## changed here
             data_collator = DataCollatorForTokenClassification(tokenizer=tokenizer)
                                         
