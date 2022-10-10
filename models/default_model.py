@@ -68,7 +68,7 @@ class HuggingFaceModel:
                                                 tokenized_wnut = tokenized_wnut, 
                                                 prefix_space = self.args.prefix_space, 
                                                 model_name = self.args.granularities_model[granularity],
-                                                device = "cpu",
+                                                device = self.args.device,
                                                 rule = 3)
                 logits_tmp = pred_tmp["pred"]
                 label = pred_tmp["label"]
