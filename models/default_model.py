@@ -88,10 +88,10 @@ class HuggingFaceModel:
                 self.log.info("logits size: (%d, %d)", len(logits_tmp), len(logits_tmp[0]))
             if count == 0:
                 # logits_sum = np.array([s.detach().numpy() for s in logits_tmp])
-                logits_sum = torch.tensor([s.detach().numpy() for s in logits_tmp])
+                logits_sum = torch.tensor(logits_tmp)
             if count > 0:
                 # logits_sum += np.array([s.detach().numpy() for s in logits_tmp]) 
-                logits_sum = torch.add(logits_sum, torch.tensor([s.detach().numpy() for s in logits_tmp]))
+                logits_sum = torch.add(logits_sum, logits_tmp)
             count += 1
 
         # logits_sum = [s.tolist() for s in logits_sum]
