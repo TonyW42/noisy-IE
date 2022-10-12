@@ -23,6 +23,7 @@ class HuggingFaceModel:
         wnut = load_dataset("wnut_17")
         logits_sum = []
         count = 0
+        model_prob = dict()
         for granularity in self.args.granularities:
             if granularity == "character":
                 clm = CharacterLevelMapping(self.args.to_char_method)
@@ -87,17 +88,37 @@ class HuggingFaceModel:
                 label = pred_tmp["label"]
                 self.log.info("-------- granularity == subword ---------")
                 self.log.info("logits size: (%d, %d)", len(logits_tmp), len(logits_tmp[0]))
-            if count == 0:
-                # logits_sum = np.array([s.detach().numpy() for s in logits_tmp])
-                logits_sum = torch.tensor(logits_tmp)
-            if count > 0:
-                # logits_sum += np.array([s.detach().numpy() for s in logits_tmp]) 
-                logits_sum = torch.add(logits_sum, torch.tensor(logits_tmp))
+            # if count == 0:
+            #     # logits_sum = np.array([s.detach().numpy() for s in logits_tmp])
+            #     logits_sum = torch.tensor(logits_tmp)
+            # if count > 0:
+            #     # logits_sum += np.array([s.detach().numpy() for s in logits_tmp]) 
+            #     logits_sum = torch.add(logits_sum, torch.tensor(logits_tmp))
+            model_prob[granularity] = logits_tmp 
+
             count += 1
 
         # logits_sum = [s.tolist() for s in logits_sum]
         # logits_sum = torch.tensor(logits_sum)
-        pred = torch.argmax(logits_sum, dim = 1)
+        pred = None
+        if self.args.ensemble_method == "soft":
+            logits_prob_matrix = torch.tensor([model_prob[key] for key in model_prob])
+            logits_sum = torch.sum(logits_prob_matrix, dim = 0)
+            pred = torch.argmax(logits_sum, dim = 1)
+        elif self.args.ensemble_method == "most_confident":
+            logits_prob_matrix = torch.tensor([model_prob[key] for key in model_prob])
+            logits_max = torch.max(logits_prob_matrix, dim = 0).values
+            pred = torch.argmax(logits_max, dim = 1)
+        elif self.args.ensemble_method == "hard":
+            model_pred = [torch.argmax(model_prob[key], dim = 1) for key in model_prob]
+            pred = torch.mode(model_pred, dim = 0)
+
+        assert pred is not None 
+
+
+            
+            
+        # pred = torch.argmax(logits_sum, dim = 1)
         ensumble_f1 = wnut_f1(pred = pred, ref = label)
         print(f"\n The F1-score of the model is {ensumble_f1} \n")
         self.log.info(f"\n The F1-score of the model is {ensumble_f1} \n")
@@ -135,6 +156,7 @@ if __name__ == '__main__':
     parser.add_argument('--to_char_method', type=str, default="inherit")
     parser.add_argument('--train', type=bool, default=False)
     parser.add_argument('--device', type=str, default="cpu")
+    parser.add_argument('--ensemble_method', type=str, default="soft")
 
     parser.add_argument('--granularities_model', type=dict, 
                         default= {"character": "google/canine-s",
