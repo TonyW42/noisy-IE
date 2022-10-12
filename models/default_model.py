@@ -110,7 +110,7 @@ class HuggingFaceModel:
             logits_max = torch.max(logits_prob_matrix, dim = 0).values
             pred = torch.argmax(logits_max, dim = 1)
         elif self.args.ensemble_method == "hard":
-            model_pred = [torch.argmax(model_prob[key], dim = 1) for key in model_prob]
+            model_pred = torch.tensor([torch.argmax(model_prob[key], dim = 1) for key in model_prob])
             pred = torch.mode(model_pred, dim = 0)
 
         assert pred is not None 
