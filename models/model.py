@@ -6,6 +6,33 @@ from data import *
 from utils.model_utils import *
 from torch import nn
 
+
+## need dataset/loader structure such as the following:
+## integrate to data.py if possible 
+class wnut_multiple_granularity(Dataset):
+    def __init__(self, wnut, args):
+        self.args = args
+        tokenizer_dict = {}
+        for name in args.model_names:
+            tokenizer_dict[name] = AutoTokenizer.from_pretrained(name, add_prefix_space=self.args.prefix_space)
+        self.tokenizer_dict = tokenizer_dict
+        ## use previous implementation of tokenization for each granularity
+        # Todo here 
+        # Should end up something like 
+        # self.data = {model_name : datadict }, where 
+        # datadict is created using previous tokenization method in data.py 
+        raise NotImplementedError
+    
+    def __len__(self):
+        ## return the length of dataset of any granularity (they must be all equal)
+        raise NotImplementedError
+    
+    def __getitem__(self, idx):
+        ## should return {model_name : input_info}, where 
+        ## input_info is input_ids, attn_mask, token_type_ids for each granularity. 
+        raise NotImplementedError
+
+
 class weighted_ensemble(BaseClassifier):
     def __init__(self, model_dict, args):
         super().__init__()
