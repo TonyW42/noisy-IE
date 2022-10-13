@@ -23,11 +23,11 @@ class wnut_multiple_granularity(Dataset):
         self.args = args
         self.data = defaultdict(DatasetDict)
         self.data_length = defaultdict(int)
-        tokenizer_dict = {}
+        self.tokenizer_dict = {}
         for name in args.model_names:
             self.tokenizer_dict[name] = AutoTokenizer.from_pretrained(name, add_prefix_space=self.args.prefix_space)
         # self.tokenizer_dict = tokenizer_dict
-        
+
         ## use previous implementation of tokenization for each granularity
         # TODO
         # Should end up something like 
@@ -60,7 +60,17 @@ class wnut_multiple_granularity(Dataset):
     def __getitem__(self, idx):
         ## should return {model_name : input_info}, where 
         ## input_info is input_ids, attn_mask, token_type_ids for each granularity. 
-        raise NotImplementedError
+        self.input_info = defaultdict(defaultdict)
+        self.input_info_test = defaultdict(defaultdict)
+        for model_name in self.args.model_names:
+            self.input_info[model_name]['input_ids'] = self.data[model_name]['train']['input_ids'] 
+            self.input_info[model_name]['attn_mask'] = self.data[model_name]['train']['attention_mask'] 
+            self.input_info[model_name]['token_type_ids'] = self.data[model_name]['train']['labels'] 
+            self.input_info_test[model_name]['input_ids'] = self.data[model_name]['test']['input_ids'] 
+            self.input_info_test[model_name]['attn_mask'] = self.data[model_name]['test']['attention_mask'] 
+            self.input_info_test[model_name]['token_type_ids'] = self.data[model_name]['test']['labels'] 
+        return self.input_info
+        # raise NotImplementedError
 
 
 class weighted_ensemble(BaseClassifier):
