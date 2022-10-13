@@ -224,7 +224,7 @@ def is_aligned(dataset):
 
 def granularity_aligned(data_length_dict):
     temp = -1
-    for model_name, data_length in data_length_dict.items():
+    for _, data_length in data_length_dict.items():
         if temp == -1:
             temp = data_length
         else:
