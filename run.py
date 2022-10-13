@@ -55,6 +55,17 @@ if __name__ == '__main__':
                                 "subword_50k": "xlm-roberta-base",
                                 "subword_30k" : "bert-base-cased"})
 
+    parser.add_argument('--embed_size_dict', type=dict, 
+                        default= {"google/canine-s": 768,
+                                  "google/canine-c": 768,
+                                  "bert-base-cased" : 768,
+                                  "bert-base-uncased" : 768,
+                                  "xlm-roberta-base" : 1024,
+                                  "roberta-base": 768,
+                                  "roberta-large": 1024,
+                                  "vinai/bertweet-base": 768,
+                                  "cardiffnlp/twitter-roberta-base-sentiment": 768})
+
     args = parser.parse_args()
     args.granularities = args.granularities.split(",")
     args.train = True if args.train == "True" else False
