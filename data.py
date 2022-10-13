@@ -222,6 +222,16 @@ def is_aligned(dataset):
                 return False
     return True 
 
+def granularity_aligned(data_length_dict):
+    temp = -1
+    for _, data_length in data_length_dict.items():
+        if temp == -1:
+            temp = data_length
+        else:
+            if data_length != temp:
+                return False
+    return True
+
 # def tokenize_wnut_char(model_name):
 #     wnut = get_unprocessed_data("wnut_17")
 #     wnut_character_level = character_level_wnut(wnut)

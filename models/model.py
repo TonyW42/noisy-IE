@@ -1,3 +1,6 @@
+import sys 
+sys.path.append("..") 
+sys.path.append("../..") 
 import torch 
 import transformers
 import numpy as np
@@ -5,32 +8,69 @@ from utils.utils import *
 from data import *
 from utils.model_utils import *
 from torch import nn
+from collections import defaultdict
+from datasets import DatasetDict, Dataset
 
 
 ## need dataset/loader structure such as the following:
 ## integrate to data.py if possible 
 class wnut_multiple_granularity(Dataset):
     def __init__(self, wnut, args):
+        """
+        preprocess multiple granularity for each model here
+        Input: wnut - result of load_dataset("wnut_17")
+        """
         self.args = args
-        tokenizer_dict = {}
+        self.data = defaultdict(DatasetDict)
+        self.data_length = defaultdict(int)
+        self.tokenizer_dict = {}
         for name in args.model_names:
-            tokenizer_dict[name] = AutoTokenizer.from_pretrained(name, add_prefix_space=self.args.prefix_space)
-        self.tokenizer_dict = tokenizer_dict
+            self.tokenizer_dict[name] = AutoTokenizer.from_pretrained(name, add_prefix_space=self.args.prefix_space)
+        # self.tokenizer_dict = tokenizer_dict
+
         ## use previous implementation of tokenization for each granularity
-        # Todo here 
+        # TODO
         # Should end up something like 
-        # self.data = {model_name : datadict }, where 
+        # self.data = {model_name : DatasetDict }, where 
         # datadict is created using previous tokenization method in data.py 
-        raise NotImplementedError
+        for name, granularity in zip(self.args.model_names, self.args.granularites):
+            if granularity == "character":
+                clm = CharacterLevelMapping(self.args.to_char_method)
+                wnut_character_level = clm.character_level_wnut(wnut)
+                tok = Tokenization(self.args.granularities_model[granularity], self.args.prefix_space)
+                tokenized_wnut = tok.tokenize_for_char_manual(wnut_character_level)
+                self.data[name] = tokenized_wnut
+                self.data_length[name] = tokenized_wnut['train'].num_rows
+            elif granularity == "subword_50k" or granularity == "subword_30k":
+                tok = Tokenization(self.args.granularities_model[granularity], self.args.prefix_space)
+                tokenized_wnut = wnut.map(tok.tokenize_and_align_labels, batched=True) ## was previously wnut_character level 
+                self.data[name] = tokenized_wnut
+                self.data_length[name] = tokenized_wnut['train'].num_rows
+            assert is_aligned(tokenized_wnut)
+        assert granularity_aligned(self.data_length)
+
+        # raise NotImplementedError
     
     def __len__(self):
         ## return the length of dataset of any granularity (they must be all equal)
-        raise NotImplementedError
+        for model_name, data_length in self.data_length_dict.items():
+            print("model_name {model_name}, the length of dataset is : {length} ".format(model_name=model_name, length=data_length))
+        return self.data_length
     
     def __getitem__(self, idx):
         ## should return {model_name : input_info}, where 
         ## input_info is input_ids, attn_mask, token_type_ids for each granularity. 
-        raise NotImplementedError
+        self.input_info = defaultdict(defaultdict)
+        self.input_info_test = defaultdict(defaultdict)
+        for model_name in self.args.model_names:
+            self.input_info[model_name]['input_ids'] = self.data[model_name]['train']['input_ids'] 
+            self.input_info[model_name]['attn_mask'] = self.data[model_name]['train']['attention_mask'] 
+            self.input_info[model_name]['token_type_ids'] = self.data[model_name]['train']['labels'] 
+            self.input_info_test[model_name]['input_ids'] = self.data[model_name]['test']['input_ids'] 
+            self.input_info_test[model_name]['attn_mask'] = self.data[model_name]['test']['attention_mask'] 
+            self.input_info_test[model_name]['token_type_ids'] = self.data[model_name]['test']['labels'] 
+        return self.input_info
+        # raise NotImplementedError
 
 
 class weighted_ensemble(BaseClassifier):
