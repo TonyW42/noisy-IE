@@ -10,6 +10,27 @@ from utils.model_utils import *
 from torch import nn
 from collections import defaultdict
 from datasets import DatasetDict, Dataset
+import typing
+
+class WNUTDatasetMulti(torch.utils.data.Dataset):
+    def __init__(self, encodings, labels, model_names):
+        # inputs are as Lists of encodings, labels, and models names 
+        # type: List[]
+        self.encodings = encodings
+        self.labels = labels
+        self.model_names = model_names
+
+    def __getitem__(self, idx):
+        # output: {model_name: {'labels': [], 'input_ids': [], 'attention_mask': []}}
+        result = {}
+        for encoding, label, model_name in zip(self.encodings, self.labels, self.model_names):
+            item = {key: torch.tensor(val[idx]) for key, val in encoding.items()}
+            item['labels'] = torch.tensor(label[idx])
+            result[model_name] = item
+        return item
+
+    def __len__(self):
+        return len(self.labels)
 
 
 ## need dataset/loader structure such as the following:
