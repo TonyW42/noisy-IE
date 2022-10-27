@@ -87,7 +87,7 @@ class wnut_multiple_granularity(Dataset):
         tokenizer_dict = {}
         self.model_dict = dict()
         print("============== loading models ==============")
-        for name in args.model_names:
+        for name in self.args.model_names:
             tokenizer_dict[name] = AutoTokenizer.from_pretrained(name, add_prefix_space=self.args.prefix_space)
             self.model_dict[name] = transformers.AutoModelForTokenClassification.from_pretrained(name, num_labels=self.args.num_labels)
         self.tokenizer_dict = tokenizer_dict
