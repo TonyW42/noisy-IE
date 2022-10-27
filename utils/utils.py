@@ -90,3 +90,11 @@ def flatten_2d(L):
             new.append(l_i)
     return new
 
+def scaled_dot_product_attention(query, key, value):
+    '''
+    scaled dot product attention in 'attention is all you need'
+    '''
+    key_transpose = key.transpose(1, 2)
+    result = torch.matmul(query, key_transpose)
+
+

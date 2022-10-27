@@ -60,7 +60,7 @@ if __name__ == '__main__':
                                   "google/canine-c": 768,
                                   "bert-base-cased" : 768,
                                   "bert-base-uncased" : 768,
-                                  "xlm-roberta-base" : 1024,
+                                  "xlm-roberta-base" : 768,
                                   "roberta-base": 768,
                                   "roberta-large": 1024,
                                   "vinai/bertweet-base": 768,

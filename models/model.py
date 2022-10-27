@@ -137,6 +137,83 @@ class wnut_multiple_granularity(Dataset):
         return return_dict_train
 
 
+
+## multitask learning 
+class attention_MTL(BaseClassifier):
+    def __init__(self, model_dict, args):
+        super().__init__()
+        self.model_dict = model_dict
+        self.args = args
+        self.lin_layer_dict = dict()
+        self.W_dict = dict()
+        self.attention_dict = dict()
+        
+        ## weight for adding attention scores 
+        self.weights = nn.Parameter(torch.empty(len(model_dict)))
+
+        ## or we can have one weight for each model
+        self.weight_dict = dict()
+    
+
+        for model_name in model_dict:
+            # add one linear layer per model
+            lin_layer = nn.Linear(self.args.embed_size_dict[model_name], args.num_labels)
+            self.lin_layer_dict[model_name] = lin_layer
+            ## attention weight matrix for each model 
+            self.W_dict = nn.Linear(self.args.embed_size_dict[model_name], self.args.embed_size_dict[model_name])
+
+            ## one set of weights for each model: UNCOMMENT THIS 
+            self.weight_dict[model_name] = nn.Parameter(torch.empty(len(model_dict)))
+            attention = nn.MultiheadAttention(
+                embed_dim = self.args.embed_size_dict[model_name],
+                num_heads = 1,
+                batch_first=True)
+            self.attention_dict[model_name] = attention
+            
+    
+    def forward(self, input_info_dict):
+        hidden_states_all = [] ## [num_model, bs, seq_len, embed_size]
+        logits_dict = dict()
+        hidden_state_dict = dict()
+        for model_name in self.model_dict:
+            ## get information
+            model = self.model_dict[model_name]
+            input_info = input_info_dict[model_name]
+            input_ids, attn_mask, token_type_ids = input_info["input_ids"], input_info["attention_mask"], input_info["ner_tags"]
+            ## get contexualized representation
+            encoded = model(input_ids = input_ids, 
+                            attention_mask = attn_mask,
+                            token_type_ids = token_type_ids)
+            hidden_states = encoded[0]  ## [bs, seq_len, embed_size]
+            hidden_state_dict[model_name] = hidden_states
+            # logits_dict[model_name] = self.lin_layer_dict[model_name](hidden_states)
+        
+        ## compute cross attention / self attention
+        for model_name_q in hidden_state_dict:
+            query = hidden_state_dict[model_name_q]
+            hidden_states_sum = torch.zeros_like(query)
+            count = 0
+            weights = self.weights ## can change to one weight one model
+            for model_name_k in hidden_state_dict:
+                key = hidden_state_dict[model_name_k]
+                attn_output, attn_output_weights = self.attention_dict[model_name](
+                    query = query, 
+                    key = key, 
+                    value = self.W_dict[model_name_k](key)
+                )
+                ## write the attention ourselves? 
+                hidden_states_sum = torch.add(hidden_states_sum, attn_output * weights[count])
+                count += 1
+            logit = self.lin_layer_dict[model_name](hidden_states_sum)
+            self.logits_dict[model_name] = logit
+    
+        return logits_dict ## {model_name: logit}
+
+        
+
+
+
+
 class weighted_ensemble(BaseClassifier):
     def __init__(self, model_dict, args):
         super().__init__()
