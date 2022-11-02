@@ -49,6 +49,7 @@ if __name__ == '__main__':
     parser.add_argument('--mode', type=str, default="train")
     parser.add_argument('--device', type=str, default=None)
     parser.add_argument('--ensemble_method', type=str, default="default")
+    parser.add_argument('--model_list', type = str, default = "xlm-roberta-base|bert-base-cased")
 
 
     parser.add_argument('--granularities_model', type=dict, 
@@ -80,7 +81,7 @@ if __name__ == '__main__':
 
     setup_seed(args.seed)
 
-    
+
 
     # model = HuggingFaceModel(args)
     # model.train()

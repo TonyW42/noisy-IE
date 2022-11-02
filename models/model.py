@@ -137,9 +137,9 @@ class wnut_multiple_granularity(Dataset):
 
 
 ## multitask learning 
-class attention_MTL(BaseClassifier):
+class attention_MTL(nn.module):
     def __init__(self, model_dict, args):
-        super().__init__()
+        super().__init__()  ## delete this ??
         self.model_dict = model_dict
         self.args = args
         self.lin_layer_dict = dict()
