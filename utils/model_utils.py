@@ -93,6 +93,7 @@ class BaseEstimator(object):
     def __init__(
         self, 
         model, 
+        cfg,
         # tokenizer, 
         criterion=None, 
         optimizer=None, 
@@ -119,6 +120,7 @@ class BaseEstimator(object):
         self.dev_step = 0
         self.test_step = 0
         self.kwargs = kwargs
+        self.cfg = cfg
 
     def step(self, data): 
         """

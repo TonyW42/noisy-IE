@@ -29,6 +29,7 @@ def train(args):
 
     classifier = MTL_classifier(
         model = model, 
+        cfg = args,
         criterion = criterion, 
         optimizer = optimizer, 
         scheduler = scheduler, 

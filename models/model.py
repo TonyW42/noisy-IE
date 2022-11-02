@@ -225,10 +225,15 @@ class MTL_classifier(BaseEstimator):
                 self.scheduler.step()
             return {
                 "loss" : loss.detach().cpu().item(), 
-                "logits_dict" : logits_dict.detach().cpu().item() ## softmax this 
+                "logits_dict" : logits_dict.detach().cpu().item(), ## softmax this 
+                "label" : data[self.args.word_model]["labels"]
                     }
         elif self.mode == "test":
-            return {"loss" : None, "logits_dict" : logits_dict.detach().cpu().item()}
+            return {
+                "loss" : None, 
+                "logits_dict" : logits_dict.detach().cpu().item(),
+                "label" : data[self.args.word_model]["labels"]
+                }
 
 
 class weighted_ensemble(BaseClassifier):

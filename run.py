@@ -50,7 +50,7 @@ if __name__ == '__main__':
     parser.add_argument('--device', type=str, default=None)
     parser.add_argument('--ensemble_method', type=str, default="default")
     parser.add_argument('--model_list', type = str, default = "xlm-roberta-base|bert-base-cased")
-
+    parser.add_argument('--word_model', type = str, default = "xlm-roberta-base")
 
     parser.add_argument('--granularities_model', type=dict, 
                         default= {"character": "google/canine-s",
