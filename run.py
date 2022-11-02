@@ -46,7 +46,7 @@ if __name__ == '__main__':
     parser.add_argument('--granularities', type=str, default="character,subword_50k")# add cahracter
     parser.add_argument('--add_space_for_char', type=bool, default=True)
     parser.add_argument('--to_char_method', type=str, default="inherit")
-    parser.add_argument('--train', type=str, default="True")
+    parser.add_argument('--mode', type=str, default="train")
     parser.add_argument('--device', type=str, default=None)
     parser.add_argument('--ensemble_method', type=str, default="soft")
 
@@ -79,5 +79,7 @@ if __name__ == '__main__':
 
     setup_seed(args.seed)
 
-    model = HuggingFaceModel(args)
-    model.train()
+    
+
+    # model = HuggingFaceModel(args)
+    # model.train()

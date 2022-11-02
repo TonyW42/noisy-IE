@@ -179,7 +179,7 @@ class attention_MTL(BaseClassifier):
             ## get information
             model = self.model_dict[model_name]
             input_info = input_info_dict[model_name]
-            input_ids, attn_mask, token_type_ids = input_info["input_ids"], input_info["attention_mask"], input_info["ner_tags"]
+            input_ids, attn_mask, token_type_ids = input_info["input_ids"], input_info["attention_mask"], input_info["labels"]
             ## get contexualized representation
             encoded = model(input_ids = input_ids, 
                             attention_mask = attn_mask,
