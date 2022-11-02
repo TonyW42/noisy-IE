@@ -93,7 +93,7 @@ class BaseEstimator(object):
     def __init__(
         self, 
         model, 
-        tokenizer, 
+        # tokenizer, 
         criterion=None, 
         optimizer=None, 
         scheduler=None, 
@@ -104,7 +104,7 @@ class BaseEstimator(object):
         **kwargs
     ): 
         self.model = model
-        self.tokenizer = tokenizer
+        # self.tokenizer = tokenizer
         self.criterion = criterion
         self.optimizer = optimizer
         self.scheduler = scheduler
