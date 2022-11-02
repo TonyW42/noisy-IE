@@ -49,23 +49,21 @@ def encode_tags(examples, tokenized_inputs):
 
 class WNUTDatasetMulti(torch.utils.data.Dataset):
     def __init__(self, encodings, labels, model_names):
-        # inputs are as Lists of encodings, labels, and models names 
-        # type: List[]
+        # inputs are as Lists of encodings, labels, and models names : []
         self.encodings = encodings
         self.labels = labels
         self.model_names = model_names
 
     def __getitem__(self, idx):
-        # output: {model_name: {'labels': [], 'input_ids': [], 'attention_mask': []}}
         result = {}
         for encoding, label, model_name in zip(self.encodings, self.labels, self.model_names):
             item = {key: torch.tensor(val[idx]) for key, val in encoding.items()}
             item['labels'] = torch.tensor(label[idx])
             result[model_name] = item
-        return item
+        return result
 
     def __len__(self):
-        return len(self.labels)
+        return len(self.labels[0])
 
 
 ## need dataset/loader structure such as the following:
@@ -179,14 +177,12 @@ class attention_MTL(BaseClassifier):
             ## get information
             model = self.model_dict[model_name]
             input_info = input_info_dict[model_name]
-            input_ids, attn_mask, token_type_ids = input_info["input_ids"], input_info["attention_mask"], input_info["labels"]
+            # input_ids, attn_mask, token_type_ids = input_info["input_ids"], input_info["attention_mask"], input_info["labels"]
             ## get contexualized representation
-            encoded = model(input_ids = input_ids, 
-                            attention_mask = attn_mask,
-                            token_type_ids = token_type_ids)
-            hidden_states = encoded[0]  ## [bs, seq_len, embed_size]
+            encoded = model(return_dict = True, output_hidden_states=True, **input_info)
+            hidden_states = encoded["hidden_states"][-1]  ## [bs, seq_len, embed_size]
             hidden_state_dict[model_name] = hidden_states
-            # logits_dict[model_name] = self.lin_layer_dict[model_name](hidden_states)
+            self.logits_dict[model_name] = self.lin_layer_dict[model_name](hidden_states)
         
         ## compute cross attention / self attention
         for model_name_q in hidden_state_dict:
@@ -199,7 +195,7 @@ class attention_MTL(BaseClassifier):
                 attn_output, attn_output_weights = self.attention_dict[model_name](
                     query = query, 
                     key = key, 
-                    value = self.W_dict[model_name_k](key)
+                    value = key
                 )
                 ## write the attention ourselves? 
                 hidden_states_sum = torch.add(hidden_states_sum, attn_output * weights[count])
@@ -207,7 +203,7 @@ class attention_MTL(BaseClassifier):
             logit = self.lin_layer_dict[model_name](hidden_states_sum)
             self.logits_dict[model_name] = logit
     
-        return logits_dict ## {model_name: logit}
+        return self.logits_dict ## {model_name: logit}
 
         
 
