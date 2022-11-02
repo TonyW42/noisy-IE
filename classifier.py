@@ -11,11 +11,11 @@ def train(args):
     model_names = args.model_list.split("|")
     model_dict = {}
     for model_name in model_names:
-        model_dict[model_name] = AutoModel(model_name)
+        model_dict[model_name] = AutoModel.from_pretrained(model_name)
     model = attention_MTL(model_dict = model_dict, args = args)
 
     criterion = torch.nn.CrossEntropyLoss().to(args.device) ## weight the loss if you wish
-    optimizer = torch.nn.optim.AdamW(model.parameter())
+    optimizer = torch.optim.AdamW(model.parameters())
     trainloader, devloader, testloader = None, None, None ## TODO: get data
     num_training_steps = args.n_epochs * len(trainloader)
     scheduler = get_scheduler(

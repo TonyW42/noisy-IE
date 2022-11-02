@@ -12,7 +12,7 @@ import random
 import os 
 import argparse
 from datetime import datetime
-import tqdm 
+from classifier import *
 
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
@@ -70,7 +70,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     args.granularities = args.granularities.split(",")
-    args.train = True if args.train == "True" else False
+    args.train = True if args.mode == "True" else False
     args.model_names = [args.granularities_model[key] for key in args.granularities_model]
     
     if not args.device:
@@ -85,3 +85,4 @@ if __name__ == '__main__':
 
     # model = HuggingFaceModel(args)
     # model.train()
+    train(args)

@@ -137,7 +137,7 @@ class wnut_multiple_granularity(Dataset):
 
 
 ## multitask learning 
-class attention_MTL(nn.module):
+class attention_MTL(nn.Module):
     def __init__(self, model_dict, args):
         super().__init__()  ## delete this ??
         self.model_dict = model_dict
@@ -234,6 +234,20 @@ class MTL_classifier(BaseEstimator):
                 "logits_dict" : logits_dict.detach().cpu().item(),
                 "label" : data[self.args.word_model]["labels"]
                 }
+
+    def _eval(self, evalloader): 
+        self.model.eval()
+        tbar = tqdm(evalloader, dynamic_ncols=True)
+        eval_loss = []
+        ys = []
+        probs = []
+        for data in tbar: 
+            loss, prob, y = self.step(data)
+            if self.mode == 'dev': 
+                tbar.set_description('dev_loss - {:.4f}'.format(loss))
+                eval_loss.append(loss)
+                ys.append(y)
+            probs.append(prob)
 
 
 class weighted_ensemble(BaseClassifier):
