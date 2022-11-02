@@ -211,7 +211,28 @@ class attention_MTL(BaseClassifier):
 
         
 
-
+class MTL_classifier(BaseEstimator):
+    def step(self, data):
+        logits_dict = self.model(
+            input_infor_dict = data
+        )
+        if self.mode == "train":
+            self.optimizer.zero_grad()
+            loss = torch.tensor(0)
+            for model_name, logit in logits_dict:
+                loss += self.criterion(logit, data[model_name]["labels"])
+                ## todo: penalize disagreement by adding other loss 
+                ## todo: penalize weighted loss instead of simple sum? 
+            loss.backward()
+            self.optimizer.step()
+            if self.scheduler is not None:
+                self.scheduler.step()
+            return {
+                "loss" : loss.detach().cpu().item(), 
+                "logits_dict" : logits_dict.detach().cpu().item() ## softmax this 
+                    }
+        elif self.mode == "test":
+            return {"loss" : None, "logits_dict" : logits_dict.detach().cpu().item()}
 
 
 class weighted_ensemble(BaseClassifier):
