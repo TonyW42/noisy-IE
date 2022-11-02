@@ -182,14 +182,17 @@ class BaseEstimator(object):
         tbar = tqdm(evalloader, dynamic_ncols=True)
         eval_loss = []
         ys = []
-        probs = []
+        preds = []
         for data in tbar: 
-            loss, prob, y = self.step(data)
+            loss, logits_dict, y = self.step(data)   ## y: [bs, seq_len]
+            logit_word = logits_dict[self.args.word_model]
+            prob = None ## softmax logit_word, [bs, seq_len, num_label] 
+            pred = torch.argmax(prob, dim = -1) ## predicted, [bs, seq_len]
             if self.mode == 'dev': 
                 tbar.set_description('dev_loss - {:.4f}'.format(loss))
                 eval_loss.append(loss)
                 ys.append(y)
-            probs.append(prob)
+            preds.append(pred) ## use pred for F1 and change how you append 
         loss = np.mean(eval_loss).item() if self.mode == 'dev' else None
         ys = np.concatenate(ys, axis=0) if self.mode == 'dev' else None
         probs = np.concatenate(probs, axis=0)
