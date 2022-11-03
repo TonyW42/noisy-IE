@@ -231,12 +231,12 @@ class MTL_classifier(BaseEstimator):
                 "logits_dict" : logits_dict, ## softmax this 
                 "label" : data[self.cfg.word_model]["labels"]
                     }
-        elif self.mode == "test":
+        elif self.mode in ("dev", "test"):
             for key, val in logits_dict.items():
                 logits_dict[key] = val.detach().cpu()
             return {
                 "loss" : None, 
-                "logits_dict" : logits_dict.detach().cpu().item(),
+                "logits_dict" : logits_dict,
                 "label" : data[self.cfg.word_model]["labels"]
                 }
     
@@ -253,8 +253,9 @@ class MTL_classifier(BaseEstimator):
 
         for data in tbar: 
             ret_step = self.step(data)   ## y: [bs, seq_len]
+            # print(ret_step)
             loss, logits_dict, y = ret_step['loss'], ret_step['logits_dict'], ret_step['label']
-            logit_word = logits_dict[self.args.word_model]
+            logit_word = logits_dict[self.cfg.word_model]
             prob = torch.nn.functional.softmax(logit_word, dim=-1) ## softmax logit_word, [bs, seq_len, num_label] 
             pred = torch.argmax(prob, dim = -1) ## predicted, [bs, seq_len]
             if self.mode == 'dev': 
