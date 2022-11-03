@@ -395,7 +395,8 @@ class flat_MTL(nn.module):
             key = hidden_states_all, 
             value = hidden_states_all
         )
-        ## TODO: do something to segment the large layer into smaller layer for each model
+
+        ## separate hidden states from the global attention output
         count = 0
         for model_name in self.model_dict: 
             input_info = input_info_dict[model_name]
