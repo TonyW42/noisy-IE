@@ -51,7 +51,7 @@ def train(args):
     model_names = args.model_list.split("|")
     model_dict = {}
     for model_name in model_names:
-        model_dict[model_name] = AutoModelForMaskedLM.from_pretrained(model_name, num_labels=args.num_labels)
+        model_dict[model_name] = AutoModel.from_pretrained(model_name, num_labels=args.num_labels)
     model = attention_MTL(model_dict = model_dict, args = args)
 
     criterion = torch.nn.CrossEntropyLoss().to(args.device) ## weight the loss if you wish
