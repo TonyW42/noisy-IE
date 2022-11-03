@@ -2,7 +2,7 @@ import torch
 import transformers 
 from models.model import *
 import numpy as np
-from transformers import AutoModel, AutoTokenizer, DataCollatorForTokenClassification, get_scheduler
+from transformers import AutoModel, AutoTokenizer, DataCollatorForTokenClassification, get_scheduler, AutoModelForMaskedLM
 import torch 
 
 
@@ -51,11 +51,11 @@ def train(args):
     model_names = args.model_list.split("|")
     model_dict = {}
     for model_name in model_names:
-        model_dict[model_name] = AutoModelForTokenClassification.from_pretrained(model_name, num_labels=args.num_labels)
+        model_dict[model_name] = AutoModelForMaskedLM.from_pretrained(model_name, num_labels=args.num_labels)
     model = attention_MTL(model_dict = model_dict, args = args)
 
     criterion = torch.nn.CrossEntropyLoss().to(args.device) ## weight the loss if you wish
-    optimizer = torch.optim.AdamW(model.parameters())
+    optimizer = torch.optim.AdamW(model.parameters(),lr=args.lr)
     trainloader, devloader, testloader = fetch_loaders(model_names) ## TODO: get data
     num_training_steps = args.n_epochs * len(trainloader)
     scheduler = get_scheduler(

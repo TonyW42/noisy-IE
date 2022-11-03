@@ -39,7 +39,7 @@ if __name__ == '__main__':
     parser.add_argument('--bs', type=int, default=16)
     parser.add_argument('--model_name', type=str, default="google/canine-s")
     parser.add_argument('--n_epochs', type=int, default=1) ## change to 4
-    parser.add_argument('--lr', type=float, default=2e-5)
+    parser.add_argument('--lr', type=float, default=2e-4)
     parser.add_argument('--weight_decay', type=float, default=0)
     parser.add_argument('--prefix_space', type=bool, default=True)
     parser.add_argument('--num_labels', type=int, default=13)
