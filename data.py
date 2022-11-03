@@ -112,7 +112,7 @@ class Tokenization:
     self.tokenizer = get_tokenizer(model_name, prefix_space)
 
   def tokenize_and_align_labels(self, examples):
-    tokenized_inputs = self.tokenizer(examples["tokens"], truncation=True, is_split_into_words=True)
+    tokenized_inputs = self.tokenizer(examples["tokens"], padding="longest", truncation=True, is_split_into_words=True)
 
     labels = []
     for i, label in enumerate(examples[f"ner_tags"]):
@@ -133,7 +133,7 @@ class Tokenization:
     return tokenized_inputs
 
   def tokenize_for_char(self, examples):
-    tokenized_inputs = self.tokenizer(examples["tokens"], truncation=True, is_split_into_words=True)
+    tokenized_inputs = self.tokenizer(examples["tokens"], padding="longest", truncation=True, is_split_into_words=True)
     tokenized_inputs["labels"] = examples["ner_tags"]
 
     labels_list = examples["ner_tags"]

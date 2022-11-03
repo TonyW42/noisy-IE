@@ -259,8 +259,8 @@ class MTL_classifier(BaseEstimator):
             prob = torch.nn.functional.softmax(logit_word, dim=-1) ## softmax logit_word, [bs, seq_len, num_label] 
             pred = torch.argmax(prob, dim = -1) ## predicted, [bs, seq_len]
             if self.mode == 'dev': 
-                tbar.set_description('dev_loss - {:.4f}'.format(loss))
-                eval_loss.append(loss)
+                # tbar.set_description('dev_loss - {:.4f}'.format(loss))
+                # eval_loss.append(loss)
                 ys.append(y)
             preds.append(pred) ## use pred for F1 and change how you append 
         # loss = np.mean(eval_loss).item() if self.mode == 'dev' else None
