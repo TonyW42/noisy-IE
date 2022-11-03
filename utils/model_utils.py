@@ -122,6 +122,8 @@ class BaseEstimator(object):
         self.kwargs = kwargs
         self.cfg = cfg
 
+        self.evaluate_metric = None
+
     def step(self, data): 
         """
         This function is responsible for feeding the data into the model and obtain predictions. 
@@ -149,14 +151,17 @@ class BaseEstimator(object):
         self.model.train()
         tbar = tqdm(trainloader, dynamic_ncols=True)
         for data in tbar: 
-            loss, prob, y = self.step(data)
+            ret_step = self.step(data)
+            loss = ret_step['loss']
+            y = ret_step['label']
+            # prob = ret_step
             self.train_step += 1
             tbar.set_description('train_loss - {:.4f}'.format(loss))
             if self.writer is not None: 
                 self.writer.add_scalar('train/loss', loss, self.train_step)
                 self.writer.add_scalar('train/micro/auc', roc_auc_score(y, prob, average='micro'), self.train_step)
                 if self.pred_thold is not None: 
-                    yhat = (prob > self.pred_thold).astype(int)
+                    # yhat = (prob > self.pred_thold).astype(int)
                     micros = precision_recall_fscore_support(y, yhat, average='micro')
                     self.writer.add_scalar('train/micro/precision', micros[0], self.train_step)
                     self.writer.add_scalar('train/micro/recall', micros[1], self.train_step)

@@ -137,7 +137,7 @@ class wnut_multiple_granularity(Dataset):
 
 
 ## multitask learning 
-class attention_MTL(nn.module):
+class attention_MTL(nn.Module):
     def __init__(self, model_dict, args):
         super().__init__()  ## delete this ??
         self.model_dict = model_dict
@@ -171,7 +171,7 @@ class attention_MTL(nn.module):
     
     def forward(self, input_info_dict):
         hidden_states_all = [] ## [num_model, bs, seq_len, embed_size]
-        logits_dict = dict()
+        self.logits_dict = dict()
         hidden_state_dict = dict()
         for model_name in self.model_dict:
             ## get information
@@ -208,32 +208,89 @@ class attention_MTL(nn.module):
         
 
 class MTL_classifier(BaseEstimator):
+
     def step(self, data):
         logits_dict = self.model(
-            input_infor_dict = data
+            input_info_dict = data
         )
         if self.mode == "train":
             self.optimizer.zero_grad()
-            loss = torch.tensor(0)
-            for model_name, logit in logits_dict:
-                loss += self.criterion(logit, data[model_name]["labels"])
+            loss = torch.tensor(0.00)
+            for model_name, logit in logits_dict.items():
+                loss += self.criterion(logit.view(-1, self.cfg.num_labels), data[model_name]["labels"].view(-1))
                 ## todo: penalize disagreement by adding other loss 
                 ## todo: penalize weighted loss instead of simple sum? 
             loss.backward()
             self.optimizer.step()
             if self.scheduler is not None:
                 self.scheduler.step()
+            for key, val in logits_dict.items():
+                logits_dict[key] = val.detach().cpu()
             return {
                 "loss" : loss.detach().cpu().item(), 
-                "logits_dict" : logits_dict.detach().cpu().item(), ## softmax this 
-                "label" : data[self.args.word_model]["labels"]
+                "logits_dict" : logits_dict, ## softmax this 
+                "label" : data[self.cfg.word_model]["labels"]
                     }
         elif self.mode == "test":
+            for key, val in logits_dict.items():
+                logits_dict[key] = val.detach().cpu()
             return {
                 "loss" : None, 
                 "logits_dict" : logits_dict.detach().cpu().item(),
-                "label" : data[self.args.word_model]["labels"]
+                "label" : data[self.cfg.word_model]["labels"]
                 }
+    
+    def _eval(self, evalloader): 
+        self.model.eval()
+        tbar = tqdm(evalloader, dynamic_ncols=True)
+        eval_loss = []
+        ys = []
+        preds = []
+
+        if self.evaluate_metric is None:
+            self.evaluate_metric = dict()
+            self.evaluate_metric['f1'] = evaluate.load("f1")
+
+        for data in tbar: 
+            ret_step = self.step(data)   ## y: [bs, seq_len]
+            loss, logits_dict, y = ret_step['loss'], ret_step['logits_dict'], ret_step['label']
+            logit_word = logits_dict[self.args.word_model]
+            prob = torch.nn.functional.softmax(logit_word, dim=-1) ## softmax logit_word, [bs, seq_len, num_label] 
+            pred = torch.argmax(prob, dim = -1) ## predicted, [bs, seq_len]
+            if self.mode == 'dev': 
+                tbar.set_description('dev_loss - {:.4f}'.format(loss))
+                eval_loss.append(loss)
+                ys.append(y)
+            preds.append(pred) ## use pred for F1 and change how you append 
+        # loss = np.mean(eval_loss).item() if self.mode == 'dev' else None
+        # ys = np.concatenate(ys, axis=0) if self.mode == 'dev' else None
+        # probs = np.concatenate(probs, axis=0)
+        
+        if self.mode == 'dev':
+            new_ys = np.array([])
+            for y_ in ys:
+                new_ys = np.append(new_ys, np.array(y_).ravel())
+            new_pred = np.array([])
+            for p_ in pred:
+                new_pred = np.append(new_pred, np.array(p_).ravel())
+            results = self.evaluate_metric['f1'].compute(predictions=new_pred, references=new_ys)
+            print(f"====== F1 result: {results}======")
+
+            # if self.writer is not None: 
+            #     self.writer.add_scalar('dev/loss', loss, self.dev_step)
+            #     self.writer.add_scalar('dev/macro/auc', macro_auc, self.dev_step)
+            #     self.writer.add_scalar('dev/micro/auc', micro_auc, self.dev_step)
+            #     if self.pred_thold is not None: 
+            #         yhats = (probs > self.pred_thold).astype(int)
+            #         macros = precision_recall_fscore_support(ys, yhats, average='macro')
+            #         self.writer.add_scalar('dev/macro/precision', macros[0], self.dev_step)
+            #         self.writer.add_scalar('dev/macro/recall', macros[1], self.dev_step)
+            #         self.writer.add_scalar('dev/macro/f1', macros[2], self.dev_step)
+            #         micros = precision_recall_fscore_support(ys, yhats, average='micro')
+            #         self.writer.add_scalar('dev/micro/precision', micros[0], self.dev_step)
+            #         self.writer.add_scalar('dev/micro/recall', micros[1], self.dev_step)
+            #         self.writer.add_scalar('dev/micro/f1', micros[2], self.dev_step)
+        return new_pred, new_ys
 
 
 class weighted_ensemble(BaseClassifier):
