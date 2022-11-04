@@ -86,6 +86,7 @@ class wnut_multiple_granularity(Dataset):
         self.model_dict = dict()
         print("============== loading models ==============")
         for name in self.args.model_names:
+            print(f"============== loading {name} ==============")
             tokenizer_dict[name] = AutoTokenizer.from_pretrained(name, add_prefix_space=self.args.prefix_space)
             self.model_dict[name] = transformers.AutoModelForTokenClassification.from_pretrained(name, num_labels=self.args.num_labels)
         self.tokenizer_dict = tokenizer_dict
@@ -97,6 +98,7 @@ class wnut_multiple_granularity(Dataset):
         # datadict is created using previous tokenization method in data.py 
         for granularity in self.args.granularities:
             name = self.args.granularities_model[granularity]
+            print(f"============== tokenizing {name} ==============")
             if granularity == "character":
                 clm = CharacterLevelMapping(self.args.to_char_method)
                 wnut_character_level = clm.character_level_wnut(self.wnut)
@@ -147,7 +149,8 @@ class attention_MTL(nn.Module):
         self.attention_dict = dict()
         
         ## weight for adding attention scores 
-        self.weights = nn.Parameter(torch.empty(len(model_dict)))
+        # self.weights = nn.Parameter(torch.empty(len(model_dict)))
+        self.weights = nn.Parameter(torch.ones(len(model_dict)))
 
         ## or we can have one weight for each model
         self.weight_dict = dict()
@@ -227,6 +230,7 @@ class MTL_classifier(BaseEstimator):
                 ## todo: penalize weighted loss instead of simple sum? 
             loss.backward()
             self.optimizer.step()
+            print(self.model.weights)
             if self.scheduler is not None:
                 self.scheduler.step()
             for key, val in logits_dict.items():
@@ -277,9 +281,9 @@ class MTL_classifier(BaseEstimator):
             for y_ in ys:
                 new_ys = np.append(new_ys, np.array(y_).ravel())
             new_pred = np.array([])
-            for p_ in pred:
+            for p_ in preds:
                 new_pred = np.append(new_pred, np.array(p_).ravel())
-            results = self.evaluate_metric['f1'].compute(predictions=new_pred, references=new_ys)
+            results = self.evaluate_metric['f1'].compute(predictions=new_pred, references=new_ys, average='macro')
             print(f"====== F1 result: {results}======")
 
             # if self.writer is not None: 
@@ -365,7 +369,7 @@ class weighted_ensemble(BaseClassifier):
 #             raise ValueError(self.mode)
 
 
-class flat_MTL(nn.module):
+class flat_MTL(nn.Module):
     def __init__(self, model_dict, args):
         super().__init__()  ## delete this ??
         self.model_dict = model_dict
