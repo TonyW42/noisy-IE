@@ -43,7 +43,7 @@ if __name__ == '__main__':
     parser.add_argument('--weight_decay', type=float, default=0)
     parser.add_argument('--prefix_space', type=bool, default=True)
     parser.add_argument('--num_labels', type=int, default=13)
-    parser.add_argument('--granularities', type=str, default="character,subword_50k")# add cahracter
+    parser.add_argument('--granularities', type=str, default="subword_50k,subword_30k")# add cahracter
     parser.add_argument('--add_space_for_char', type=bool, default=True)
     parser.add_argument('--to_char_method', type=str, default="inherit")
     parser.add_argument('--mode', type=str, default="train")
@@ -80,7 +80,6 @@ if __name__ == '__main__':
             args.device = "cpu"
 
     setup_seed(args.seed)
-
 
 
     # model = HuggingFaceModel(args)
