@@ -161,13 +161,18 @@ class attention_MTL(nn.Module):
             self.W_dict = nn.Linear(self.args.embed_size_dict[model_name], self.args.embed_size_dict[model_name])
 
             ## one set of weights for each model: UNCOMMENT THIS 
-            self.weight_dict[model_name] = nn.Parameter(torch.empty(len(model_dict)))
+            self.weight_dict[model_name] = nn.Parameter(torch.empty(len(model_dict)), requires_grad=True)
             attention = nn.MultiheadAttention(
                 embed_dim = self.args.embed_size_dict[model_name],
                 num_heads = 1,
                 batch_first=True)
             self.attention_dict[model_name] = attention
-            
+
+            nn.init.trunc_normal_(self.weight_dict[model_name].data, std = 0.02)
+            nn.init.trunc_normal_(self.lin_layer_dict[model_name].weight, std = 0.02)
+            # nn.init.trunc_normal_(self.attention_dict[model_name].v_proj_weight, std = 0.02)
+            # nn.init.trunc_normal_(self.attention_dict[model_name].k_proj_weight, std = 0.02)
+            # attention.k_proj_weight
     
     def forward(self, input_info_dict):
         hidden_states_all = [] ## [num_model, bs, seq_len, embed_size]
