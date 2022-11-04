@@ -149,7 +149,8 @@ class attention_MTL(nn.Module):
         self.attention_dict = dict()
         
         ## weight for adding attention scores 
-        self.weights = nn.Parameter(torch.empty(len(model_dict)))
+        # self.weights = nn.Parameter(torch.empty(len(model_dict)))
+        self.weights = nn.Parameter(torch.ones(len(model_dict)))
 
         ## or we can have one weight for each model
         self.weight_dict = dict()
@@ -224,6 +225,7 @@ class MTL_classifier(BaseEstimator):
                 ## todo: penalize weighted loss instead of simple sum? 
             loss.backward()
             self.optimizer.step()
+            print(self.model.weights)
             if self.scheduler is not None:
                 self.scheduler.step()
             for key, val in logits_dict.items():
