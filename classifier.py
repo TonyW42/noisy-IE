@@ -45,6 +45,45 @@ def fetch_loaders(model_names):
     return loader_train, loader_valid, loader_test
 
 
+def fetch_loaders2(model_names, args):
+    from datasets import load_dataset
+    wnut = load_dataset("wnut_17")
+    data_loader = wnut_multiple_granularity(wnut, args)
+    # model_main = data_loader.model_dict
+    tokenized_wnut_main = data_loader.data_
+
+    train_encoding_list, train_label_list = [], []
+    valid_encoding_list, valid_label_list = [], []
+    test_encoding_list, test_label_list = [], []
+    
+    for model_name in model_names:
+        train_encoding_list.append({'input_ids': tokenized_wnut_main[model_name]['train']['input_ids'],
+                                'attention_mask': tokenized_wnut_main[model_name]['train']['attention_mask'],
+                                })
+        train_label_list.append(tokenized_wnut_main[model_name]['train']['labels'])
+        valid_encoding_list.append({'input_ids': tokenized_wnut_main[model_name]['validation']['input_ids'],
+                                'attention_mask': tokenized_wnut_main[model_name]['validation']['attention_mask'],
+                                })
+        valid_label_list.append(tokenized_wnut_main[model_name]['validation']['labels'])
+        test_encoding_list.append({'input_ids': tokenized_wnut_main[model_name]['test']['input_ids'],
+                                'attention_mask': tokenized_wnut_main[model_name]['test']['attention_mask'],
+                                })
+        test_label_list.append(tokenized_wnut_main[model_name]['test']['labels'])
+
+    data_train = WNUTDatasetMulti(train_encoding_list, train_label_list, model_names)
+    data_valid = WNUTDatasetMulti(valid_encoding_list, valid_label_list, model_names)
+    data_test = WNUTDatasetMulti(test_encoding_list, test_encoding_list, model_names)
+    loader_train = torch.utils.data.DataLoader(
+        data_train, batch_size=32
+    )
+    loader_valid = torch.utils.data.DataLoader(
+        data_valid, batch_size=32
+    )
+    loader_test = torch.utils.data.DataLoader(
+        data_test, batch_size=32
+    )
+    return loader_train, loader_valid, loader_test
+
 
 def train(args):
     ## initialize model
@@ -57,6 +96,7 @@ def train(args):
     criterion = torch.nn.CrossEntropyLoss().to(args.device) ## weight the loss if you wish
     optimizer = torch.optim.AdamW(model.parameters(),lr=args.lr)
     trainloader, devloader, testloader = fetch_loaders(model_names) ## TODO: get data
+    # trainloader, devloader, testloader = fetch_loaders2(model_names, args)
     num_training_steps = args.n_epochs * len(trainloader)
     scheduler = get_scheduler(
         "linear",
