@@ -223,7 +223,7 @@ class MTL_classifier(BaseEstimator):
         )
         if self.mode == "train":
             self.optimizer.zero_grad()
-            loss = torch.tensor(0.00)
+            loss = torch.tensor(0.00, requires_grad = True)
             for model_name, logit in logits_dict.items():
                 loss += self.criterion(logit.view(-1, self.cfg.num_labels), data[model_name]["labels"].view(-1))
                 ## todo: penalize disagreement by adding other loss 
