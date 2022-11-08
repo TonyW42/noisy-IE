@@ -281,13 +281,19 @@ class MTL_classifier(BaseEstimator):
         # probs = np.concatenate(probs, axis=0)
         
         if self.mode == 'dev':
-            new_ys = np.array([])
+            flatten_ys, flatten_pred = np.array([]), np.array([])
             for y_ in ys:
-                new_ys = np.append(new_ys, np.array(y_).ravel())
-            new_pred = np.array([])
+                flatten_ys = np.append(flatten_ys, np.array(y_).ravel())
             for p_ in preds:
-                new_pred = np.append(new_pred, np.array(p_).ravel())
-            results = self.evaluate_metric['f1'].compute(predictions=new_pred, references=new_ys, average='macro')
+                flatten_pred = np.append(flatten_pred, np.array(p_).ravel())
+            
+            eval_ys, eval_pred = np.array([]), np.array([])
+            for y_, p_ in zip(flatten_ys, flatten_pred):
+                if y_ != -100:
+                    eval_ys = np.append(eval_ys, np.array(y_).ravel())
+                    eval_pred = np.append(eval_pred, np.array(p_).ravel())
+
+            results = self.evaluate_metric['f1'].compute(predictions=eval_pred, references=eval_ys, average='macro')
             print(f"====== F1 result: {results}======")
 
             # if self.writer is not None: 
@@ -304,7 +310,7 @@ class MTL_classifier(BaseEstimator):
             #         self.writer.add_scalar('dev/micro/precision', micros[0], self.dev_step)
             #         self.writer.add_scalar('dev/micro/recall', micros[1], self.dev_step)
             #         self.writer.add_scalar('dev/micro/f1', micros[2], self.dev_step)
-        return new_pred, new_ys
+        return eval_pred, eval_ys
 
 
 # class weighted_ensemble(BaseClassifier):
