@@ -6,7 +6,7 @@ from transformers import AutoModel, AutoTokenizer, DataCollatorForTokenClassific
 import torch 
 
 
-def fetch_loaders(model_names):
+def fetch_loaders(model_names, args):
     from datasets import load_dataset
     wnut = load_dataset("wnut_17")
     train_encoding_list, train_label_list = [], []
@@ -34,13 +34,13 @@ def fetch_loaders(model_names):
     data_valid = WNUTDatasetMulti(valid_encoding_list, valid_label_list, model_names)
     data_test = WNUTDatasetMulti(test_encoding_list, test_encoding_list, model_names)
     loader_train = torch.utils.data.DataLoader(
-        data_train, batch_size=32
+        data_train, batch_size=args.train_batch_size
     )
     loader_valid = torch.utils.data.DataLoader(
-        data_valid, batch_size=32
+        data_valid, batch_size=args.eval_batch_size
     )
     loader_test = torch.utils.data.DataLoader(
-        data_test, batch_size=32
+        data_test, batch_size=args.test_batch_size
     )
     return loader_train, loader_valid, loader_test
 
@@ -101,7 +101,7 @@ def train(args):
     for name, p in model.named_parameters():
         print(name)
     optimizer = torch.optim.AdamW(model.parameters(),lr=args.lr)
-    trainloader, devloader, testloader = fetch_loaders(model_names) ## TODO: get data
+    trainloader, devloader, testloader = fetch_loaders(model_names, args) ## TODO: get data
     # trainloader, devloader, testloader = fetch_loaders2(model_names, args)
     num_training_steps = args.n_epochs * len(trainloader)
     scheduler = get_scheduler(
