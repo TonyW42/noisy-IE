@@ -144,16 +144,16 @@ class attention_MTL(nn.Module):
         super().__init__()  ## delete this ??
         self.model_dict = model_dict
         self.args = args
-        self.lin_layer_dict = dict()
-        self.W_dict = dict()
-        self.attention_dict = dict()
+        self.lin_layer_dict = nn.ParameterDict()
+        # self.W_dict = nn.ParameterDict()
+        self.attention_dict = nn.ParameterDict()
         
         ## weight for adding attention scores 
         # self.weights = nn.Parameter(torch.empty(len(model_dict)))
-        self.weights = nn.Parameter(torch.ones(len(model_dict)))
+        # self.weights = nn.Parameter(torch.ones(len(model_dict)), requires_grad=True)
 
         ## or we can have one weight for each model
-        self.weight_dict = dict()
+        self.weight_dict = nn.ParameterDict()
     
 
         for model_name in model_dict:
@@ -161,21 +161,15 @@ class attention_MTL(nn.Module):
             lin_layer = nn.Linear(self.args.embed_size_dict[model_name], args.num_labels)
             self.lin_layer_dict[model_name] = lin_layer
             ## attention weight matrix for each model 
-            self.W_dict = nn.Linear(self.args.embed_size_dict[model_name], self.args.embed_size_dict[model_name])
+            # self.W_dict = nn.Linear(self.args.embed_size_dict[model_name], self.args.embed_size_dict[model_name])
 
             ## one set of weights for each model: UNCOMMENT THIS 
-            self.weight_dict[model_name] = nn.Parameter(torch.empty(len(model_dict)), requires_grad=True)
+            self.weight_dict[model_name] = nn.Parameter(torch.ones(len(model_dict)), requires_grad=True)
             attention = nn.MultiheadAttention(
                 embed_dim = self.args.embed_size_dict[model_name],
                 num_heads = 1,
                 batch_first=True)
             self.attention_dict[model_name] = attention
-
-            nn.init.trunc_normal_(self.weight_dict[model_name].data, std = 0.02)
-            nn.init.trunc_normal_(self.lin_layer_dict[model_name].weight, std = 0.02)
-            # nn.init.trunc_normal_(self.attention_dict[model_name].v_proj_weight, std = 0.02)
-            # nn.init.trunc_normal_(self.attention_dict[model_name].k_proj_weight, std = 0.02)
-            # attention.k_proj_weight
     
     def forward(self, input_info_dict):
         hidden_states_all = [] ## [num_model, bs, seq_len, embed_size]
@@ -197,7 +191,7 @@ class attention_MTL(nn.Module):
             query = hidden_state_dict[model_name_q]
             hidden_states_sum = torch.zeros_like(query)
             count = 0
-            weights = self.weights ## can change to one weight one model
+            # weights = self.weight_dict[model_name_q] ## can change to one weight one model
             for model_name_k in hidden_state_dict:
                 key = hidden_state_dict[model_name_k]
                 attn_output, attn_output_weights = self.attention_dict[model_name](
@@ -206,7 +200,7 @@ class attention_MTL(nn.Module):
                     value = key
                 )
                 ## write the attention ourselves? 
-                hidden_states_sum = torch.add(hidden_states_sum, attn_output * weights[count])
+                hidden_states_sum = torch.add(hidden_states_sum, attn_output * self.weight_dict[model_name_q][count])
                 count += 1
             logit = self.lin_layer_dict[model_name](hidden_states_sum)
             self.logits_dict[model_name] = logit
@@ -225,16 +219,27 @@ class MTL_classifier(BaseEstimator):
             self.optimizer.zero_grad()
             loss = torch.tensor(0.00, requires_grad = True)
             for model_name, logit in logits_dict.items():
-                loss += self.criterion(logit.view(-1, self.cfg.num_labels), data[model_name]["labels"].view(-1))
+                if model_name == 'xlm-roberta-base':
+                    loss_tmp1 = self.criterion[model_name](logit.view(-1, self.cfg.num_labels), data[model_name]["labels"].view(-1))
+                else: 
+                    loss_tmp2 = self.criterion[model_name](logit.view(-1, self.cfg.num_labels), data[model_name]["labels"].view(-1))
+                # loss = torch.cat((loss, torch.unsqueeze(self.criterion[model_name](logit.view(-1, self.cfg.num_labels), data[model_name]["labels"].view(-1)), 0)))
                 ## todo: penalize disagreement by adding other loss 
                 ## todo: penalize weighted loss instead of simple sum? 
+            # loss = torch.sum(loss)
+            loss = loss_tmp1 + loss_tmp2
             loss.backward()
             self.optimizer.step()
-            print(self.model.weights)
+            # print("=========  step weight ===========")
+            # print(list(self.model.parameters())[0].grad)
+            # print(self.model.weights.data)
+            # print(self.model.lin_layer_dict['bert-base-cased'].weight)
+            # print(self.model.lin_layer_dict['xlm-roberta-base'].weight)
             if self.scheduler is not None:
                 self.scheduler.step()
             for key, val in logits_dict.items():
                 logits_dict[key] = val.detach().cpu()
+            self.optimizer.zero_grad()
             return {
                 "loss" : loss.detach().cpu().item(), 
                 "logits_dict" : logits_dict, ## softmax this 
@@ -262,7 +267,6 @@ class MTL_classifier(BaseEstimator):
 
         for data in tbar: 
             ret_step = self.step(data)   ## y: [bs, seq_len]
-            # print(ret_step)
             loss, logits_dict, y = ret_step['loss'], ret_step['logits_dict'], ret_step['label']
             logit_word = logits_dict[self.cfg.word_model]
             prob = torch.nn.functional.softmax(logit_word, dim=-1) ## softmax logit_word, [bs, seq_len, num_label] 
@@ -303,70 +307,37 @@ class MTL_classifier(BaseEstimator):
         return new_pred, new_ys
 
 
-class weighted_ensemble(BaseClassifier):
-    def __init__(self, model_dict, args):
-        super().__init__()
-        self.model_dict = model_dict
-        total_embed_size = 0
-        for model_name in model_dict:
-            total_embed_size += self.args.embed_size_dict[model_name]
-        self.lin1 = nn.Linear(total_embed_size, args.num_labels)
-        self.args = args
+# class weighted_ensemble(BaseClassifier):
+#     def __init__(self, model_dict, args):
+#         super().__init__()
+#         self.model_dict = model_dict
+#         total_embed_size = 0
+#         for model_name in model_dict:
+#             total_embed_size += self.args.embed_size_dict[model_name]
+#         self.lin1 = nn.Linear(total_embed_size, args.num_labels)
+#         self.args = args
     
-    def forward(self, input_info_dict):
-        hidden_states_all = [] ## [num_model, bs, seq_len, embed_size]
-        for model_name in self.model_dict:
-            model = self.model_dict[model_name]
-            input_info = input_info_dict[model_name]
-            input_ids, attn_mask, token_type_ids = input_info["input_ids"], input_info["attention_mask"], input_info["ner_tags"]
-            encoded = model(input_ids = input_ids, 
-                            attention_mask = attn_mask,
-                            token_type_ids = token_type_ids)
-            hidden_states = encoded[0]  ## [bs, seq_len, embed_size]
-            hidden_states_all.append(hidden_states) 
-            ##########################
-            ## make sure that seq_len is aligned fr subword/character model
-            ###########################
+#     def forward(self, input_info_dict):
+#         hidden_states_all = [] ## [num_model, bs, seq_len, embed_size]
+#         for model_name in self.model_dict:
+#             model = self.model_dict[model_name]
+#             input_info = input_info_dict[model_name]
+#             input_ids, attn_mask, token_type_ids = input_info["input_ids"], input_info["attention_mask"], input_info["ner_tags"]
+#             encoded = model(input_ids = input_ids, 
+#                             attention_mask = attn_mask,
+#                             token_type_ids = token_type_ids)
+#             hidden_states = encoded[0]  ## [bs, seq_len, embed_size]
+#             hidden_states_all.append(hidden_states) 
+#             ##########################
+#             ## make sure that seq_len is aligned fr subword/character model
+#             ###########################
 
 
 
-        hidden_states_cat = torch.cat(hidden_states_all, dim = 3)
-        logits = self.lin1(hidden_states_cat)
-        return logits ## [bs, seq_len, num_labels]
-        
+#         hidden_states_cat = torch.cat(hidden_states_all, dim = 3)
+#         logits = self.lin1(hidden_states_cat)
+#         return logits ## [bs, seq_len, num_labels]
 
-# class weighted_estimater(BaseEstimator):
-#     def __init__(self, model, tokenizer, criterion=None, optimizer=None, scheduler=None, logger=None, writer=None, pred_thold=None, device='cpu', **kwargs):
-#         super().__init__(model, tokenizer, criterion, optimizer, scheduler, logger, writer, pred_thold, device, **kwargs)
-#         self.clip_grad_norm = 1
-
-#     def step(self, data):
-#         logits = self.model(
-#             data['input_ids'].to(self.device, dtype=torch.long), 
-#             data['attention_mask'].to(self.device, dtype=torch.long), 
-#             data['ner_tags'].to(self.device, dtype=torch.long)
-#         )
-#         if self.mode in {'train', 'dev'}: 
-#             # training or developmenting, ground true labels are provided
-#             if self.mode == 'train': 
-#                 self.optimizer.zero_grad()
-#             loss = self.criterion(logits, data['labels'].to(self.device, dtype=torch.float))
-#             if self.mode == 'train': 
-#                 loss.backward()
-#                 nn.utils.clip_grad_norm_(self.model.parameters(), self.clip_grad_norm) # TODO: not equivalent to tf.clip_by_global_norm
-#                 self.optimizer.step()
-#                 if self.scheduler is not None: 
-#                     self.scheduler.step()
-#             return (
-#                 loss.detach().cpu().item(), 
-#                 torch.softmax(logits).detach().cpu().numpy(), 
-#                 data['labels'].numpy()
-#             )
-#         elif self.mode == 'test': 
-#             # testing, no ground true label is provided
-#             return None, torch.sigmoid(logits).detach().cpu().numpy(), None
-#         else: 
-#             raise ValueError(self.mode)
 
 
 class flat_MTL(nn.Module):
@@ -374,7 +345,7 @@ class flat_MTL(nn.Module):
         super().__init__()  ## delete this ??
         self.model_dict = model_dict
         self.args = args
-        self.lin_layer_dict = dict()
+        self.lin_layer_dict = nn.ParameterDict()
         self.attention_layer = nn.MultiheadAttention(
             embed_dim = self.args.embed_size_dict[self.args.word_model],
             num_heads = 1,
@@ -399,7 +370,7 @@ class flat_MTL(nn.Module):
             hidden_states = encoded["hidden_states"][-1]  ## [bs, seq_len, embed_size]
             ## TODO: add positional embbeding 
             hidden_states_all.append(hidden_states)
-        hidden_states_all = torch.cat(hidden_states_all, dim = 2)
+        hidden_states_all = torch.cat(hidden_states_all, dim = 1)
         attn_output, attn_output_weights = self.attention_layer(
             query = hidden_states_all, 
             key = hidden_states_all, 
@@ -413,9 +384,8 @@ class flat_MTL(nn.Module):
             seq_len_model = input_info["input_ids"].shape[1]
             count_next = count + seq_len_model
             self.hidden_states_dict[model_name] = attn_output[:, count:count_next, :]
-            self.logit_dict[model_name] = self.lin_layer_dict[model_name](self.hidden_states_dict[model_name])
+            self.logits_dict[model_name] = self.lin_layer_dict[model_name](self.hidden_states_dict[model_name])
             count += seq_len_model
-
     
         return self.logits_dict ## {model_name: logit}
             
