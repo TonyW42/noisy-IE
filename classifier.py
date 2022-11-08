@@ -91,9 +91,15 @@ def train(args):
     model_dict = {}
     for model_name in model_names:
         model_dict[model_name] = AutoModel.from_pretrained(model_name, num_labels=args.num_labels)
-    model = attention_MTL(model_dict = model_dict, args = args)
+    model = flat_MTL(model_dict = model_dict, args = args)
 
-    criterion = torch.nn.CrossEntropyLoss().to(args.device) ## weight the loss if you wish
+    criterion = {}
+    for model_name in model_names:
+        criterion[model_name] = torch.nn.CrossEntropyLoss().to(args.device)
+    # criterion = torch.nn.CrossEntropyLoss().to(args.device) ## weight the loss if you wish
+    print(" ====== parameters? ========")
+    for name, p in model.named_parameters():
+        print(name)
     optimizer = torch.optim.AdamW(model.parameters(),lr=args.lr)
     trainloader, devloader, testloader = fetch_loaders(model_names) ## TODO: get data
     # trainloader, devloader, testloader = fetch_loaders2(model_names, args)
@@ -122,7 +128,7 @@ def train(args):
 
     if args.mode == "test":
         pass 
-        ## use functions from evaluate_utils to test model.
+        # use functions from evaluate_utils to test model.
 
     ## do something to evaluate the model  
     ## Note: could evaluate using seqeval in the estimator's _eval() function 
