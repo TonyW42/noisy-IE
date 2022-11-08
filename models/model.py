@@ -290,8 +290,8 @@ class MTL_classifier(BaseEstimator):
             eval_ys, eval_pred = np.array([]), np.array([])
             for y_, p_ in zip(flatten_ys, flatten_pred):
                 if y_ != -100:
-                    eval_ys = np.append(eval_ys, np.array(y_).ravel())
-                    eval_pred = np.append(eval_pred, np.array(p_).ravel())
+                    eval_ys = np.append(eval_ys, y_)
+                    eval_pred = np.append(eval_pred, p_)
 
             results = self.evaluate_metric['f1'].compute(predictions=eval_pred, references=eval_ys, average='macro')
             print(f"====== F1 result: {results}======")
