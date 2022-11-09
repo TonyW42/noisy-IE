@@ -233,7 +233,7 @@ class MTL_classifier(BaseEstimator):
                 ## todo: penalize disagreement by adding other loss 
                 ## todo: penalize weighted loss instead of simple sum? 
             # loss = torch.sum(loss)
-            loss = loss_tmp1 + loss_tmp2
+            # loss = loss_tmp1 + loss_tmp2
             loss.backward()
             self.optimizer.step()
             # print("=========  step weight ===========")
