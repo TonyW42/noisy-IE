@@ -407,6 +407,8 @@ class flat_MTL(nn.Module):
                 key = attn_output, 
                 value = attn_output
             )
+        else:
+            attn_output = hidden_states_all
 
         ## separate hidden states from the global attention output
         count = 0
