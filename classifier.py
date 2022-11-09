@@ -88,12 +88,12 @@ def fetch_loaders2(model_names, args):
 def train(args):
     ## initialize model
     model_names = args.model_list.split("|")
-    model_dict = {}
+    model_dict = torch.nn.ModuleDict()
     for model_name in model_names:
         model_dict[model_name] = AutoModel.from_pretrained(model_name, num_labels=args.num_labels)
     model = flat_MTL(model_dict = model_dict, args = args)
 
-    criterion = {}
+    criterion = torch.nn.ModuleDict()
     for model_name in model_names:
         criterion[model_name] = torch.nn.CrossEntropyLoss().to(args.device)
     # criterion = torch.nn.CrossEntropyLoss().to(args.device) ## weight the loss if you wish

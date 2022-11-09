@@ -212,11 +212,11 @@ class attention_MTL(nn.Module):
 class MTL_classifier(BaseEstimator):
 
     def step(self, data):
+        self.optimizer.zero_grad()
         logits_dict = self.model(
             input_info_dict = data
         )
         if self.mode == "train":
-            self.optimizer.zero_grad()
             # loss = torch.tensor(0.00, requires_grad = True)
             count = 0
             for model_name, logit in logits_dict.items():
