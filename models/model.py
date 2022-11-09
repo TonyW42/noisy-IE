@@ -362,7 +362,7 @@ class flat_MTL(nn.Module):
         self.model_dict = model_dict
         self.args = args
         self.lin_layer_dict = nn.ModuleDict()
-        self.num_att_layers = 1
+        self.num_att_layers = args.num_att_layers
         self.attention_layers = nn.ModuleList(
             [nn.MultiheadAttention(
             embed_dim = self.args.embed_size_dict[self.args.word_model],
@@ -394,18 +394,19 @@ class flat_MTL(nn.Module):
             ## TODO: add positional embbeding 
             hidden_states_all.append(hidden_states)
         hidden_states_all = torch.cat(hidden_states_all, dim = 1)
-        attn_output, attn_output_weights = self.attention_layers[0](
-            query = hidden_states_all, 
-            key = hidden_states_all, 
-            value = hidden_states_all
-        )
+        if self.num_att_layers > 0:
+            attn_output, attn_output_weights = self.attention_layers[0](
+                query = hidden_states_all, 
+                key = hidden_states_all, 
+                value = hidden_states_all
+            )
 
-        for i in range(1, self.num_att_layers):
-            attn_output, attn_output_weights = self.attention_layers[i](
-            query = attn_output, 
-            key = attn_output, 
-            value = attn_output
-        )
+            for i in range(1, self.num_att_layers):
+                attn_output, attn_output_weights = self.attention_layers[i](
+                query = attn_output, 
+                key = attn_output, 
+                value = attn_output
+            )
 
         ## separate hidden states from the global attention output
         count = 0
