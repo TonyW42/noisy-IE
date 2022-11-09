@@ -217,12 +217,18 @@ class MTL_classifier(BaseEstimator):
         )
         if self.mode == "train":
             self.optimizer.zero_grad()
-            loss = torch.tensor(0.00, requires_grad = True)
+            # loss = torch.tensor(0.00, requires_grad = True)
+            count = 0
             for model_name, logit in logits_dict.items():
-                if model_name == 'xlm-roberta-base':
-                    loss_tmp1 = self.criterion[model_name](logit.view(-1, self.cfg.num_labels), data[model_name]["labels"].view(-1))
+                if count == 0: 
+                    loss = self.criterion[model_name](logit.view(-1, self.cfg.num_labels), data[model_name]["labels"].view(-1))
                 else: 
-                    loss_tmp2 = self.criterion[model_name](logit.view(-1, self.cfg.num_labels), data[model_name]["labels"].view(-1))
+                    loss += self.criterion[model_name](logit.view(-1, self.cfg.num_labels), data[model_name]["labels"].view(-1))
+                count += 1
+                # if model_name == 'xlm-roberta-base':
+                #     loss_tmp1 = self.criterion[model_name](logit.view(-1, self.cfg.num_labels), data[model_name]["labels"].view(-1))
+                # else: 
+                #     loss_tmp2 = self.criterion[model_name](logit.view(-1, self.cfg.num_labels), data[model_name]["labels"].view(-1))
                 # loss = torch.cat((loss, torch.unsqueeze(self.criterion[model_name](logit.view(-1, self.cfg.num_labels), data[model_name]["labels"].view(-1)), 0)))
                 ## todo: penalize disagreement by adding other loss 
                 ## todo: penalize weighted loss instead of simple sum? 
