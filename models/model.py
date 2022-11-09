@@ -202,7 +202,7 @@ class attention_MTL(nn.Module):
                 ## write the attention ourselves? 
                 hidden_states_sum = torch.add(hidden_states_sum, attn_output * self.weight_dict[model_name_q][count])
                 count += 1
-            logit = self.lin_layer_dict[model_name](hidden_states_sum)
+            logit = nn.functional.softmax(self.lin_layer_dict[model_name](hidden_states_sum), dim=-1)
             self.logits_dict[model_name] = logit
     
         return self.logits_dict ## {model_name: logit}
@@ -232,9 +232,19 @@ class MTL_classifier(BaseEstimator):
             self.optimizer.step()
             # print("=========  step weight ===========")
             # print(list(self.model.parameters())[0].grad)
-            # print(self.model.weights.data)
-            # print(self.model.lin_layer_dict['bert-base-cased'].weight)
-            # print(self.model.lin_layer_dict['xlm-roberta-base'].weight)
+            # print(self.model.attention_layers[1].in_proj_weight[0][:10])
+            # print(self.model.attention_layers[2].in_proj_weight[0][:10])
+            # print(self.model.attention_layers[3].in_proj_weight[0][:10])
+            # print(self.model.attention_layers[4].in_proj_weight[0][:10])
+            # print(self.model.attention_layers[5].in_proj_weight[0][:10])
+            # print("==================================")
+
+            # print(self.model.attention_layers[0].out_proj.weight[0][:10])
+            # print(self.model.attention_layers[1].out_proj.weight[0][:10])
+            # print(self.model.attention_layers[2].out_proj.weight[0][:10])
+            # print(self.model.attention_layers[3].out_proj.weight[0][:10])
+            # print(self.model.attention_layers[4].out_proj.weight[0][:10])
+            # print(self.model.attention_layers[5].out_proj.weight[0][:10])
             if self.scheduler is not None:
                 self.scheduler.step()
             for key, val in logits_dict.items():
@@ -269,8 +279,8 @@ class MTL_classifier(BaseEstimator):
             ret_step = self.step(data)   ## y: [bs, seq_len]
             loss, logits_dict, y = ret_step['loss'], ret_step['logits_dict'], ret_step['label']
             logit_word = logits_dict[self.cfg.word_model]
-            prob = torch.nn.functional.softmax(logit_word, dim=-1) ## softmax logit_word, [bs, seq_len, num_label] 
-            pred = torch.argmax(prob, dim = -1) ## predicted, [bs, seq_len]
+            # prob = torch.nn.functional.softmax(logit_word, dim=-1) ## softmax logit_word, [bs, seq_len, num_label] 
+            pred = torch.argmax(logit_word, dim = -1) ## predicted, [bs, seq_len]
             if self.mode == 'dev': 
                 # tbar.set_description('dev_loss - {:.4f}'.format(loss))
                 # eval_loss.append(loss)
@@ -290,8 +300,8 @@ class MTL_classifier(BaseEstimator):
             eval_ys, eval_pred = np.array([]), np.array([])
             for y_, p_ in zip(flatten_ys, flatten_pred):
                 if y_ != -100:
-                    eval_ys = np.append(eval_ys, np.array(y_).ravel())
-                    eval_pred = np.append(eval_pred, np.array(p_).ravel())
+                    eval_ys = np.append(eval_ys, y_)
+                    eval_pred = np.append(eval_pred, p_)
 
             results = self.evaluate_metric['f1'].compute(predictions=eval_pred, references=eval_ys, average='macro')
             print(f"====== F1 result: {results}======")
@@ -351,11 +361,18 @@ class flat_MTL(nn.Module):
         super().__init__()  ## delete this ??
         self.model_dict = model_dict
         self.args = args
-        self.lin_layer_dict = nn.ParameterDict()
-        self.attention_layer = nn.MultiheadAttention(
+        self.lin_layer_dict = nn.ModuleDict()
+        self.num_att_layers = 1
+        self.attention_layers = nn.ModuleList(
+            [nn.MultiheadAttention(
             embed_dim = self.args.embed_size_dict[self.args.word_model],
             num_heads = 1,
-            batch_first=True)
+            batch_first=True) for _ in range(self.num_att_layers)]
+        )
+        # self.attention_layer = nn.MultiheadAttention(
+        #     embed_dim = self.args.embed_size_dict[self.args.word_model],
+        #     num_heads = 1,
+        #     batch_first=True)
         
         for model_name in model_dict:
             # add one linear layer per model
@@ -377,10 +394,17 @@ class flat_MTL(nn.Module):
             ## TODO: add positional embbeding 
             hidden_states_all.append(hidden_states)
         hidden_states_all = torch.cat(hidden_states_all, dim = 1)
-        attn_output, attn_output_weights = self.attention_layer(
+        attn_output, attn_output_weights = self.attention_layers[0](
             query = hidden_states_all, 
             key = hidden_states_all, 
             value = hidden_states_all
+        )
+
+        for i in range(1, self.num_att_layers):
+            attn_output, attn_output_weights = self.attention_layers[i](
+            query = attn_output, 
+            key = attn_output, 
+            value = attn_output
         )
 
         ## separate hidden states from the global attention output
@@ -390,7 +414,7 @@ class flat_MTL(nn.Module):
             seq_len_model = input_info["input_ids"].shape[1]
             count_next = count + seq_len_model
             self.hidden_states_dict[model_name] = attn_output[:, count:count_next, :]
-            self.logits_dict[model_name] = self.lin_layer_dict[model_name](self.hidden_states_dict[model_name])
+            self.logits_dict[model_name] = nn.functional.softmax(self.lin_layer_dict[model_name](self.hidden_states_dict[model_name]), dim=-1)
             count += seq_len_model
     
         return self.logits_dict ## {model_name: logit}

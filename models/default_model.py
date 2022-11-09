@@ -117,66 +117,66 @@ class HuggingFaceModel:
         # print(f"\n The F1-score of the model is {wnut_f1_1} \n")
         # print(f"\n The F1-score of the model is {wnut_f1_2} \n")
 
-    def _train(self):
-        wnut = load_dataset("wnut_17")
-        print(self.args.model_names)
-        data_loader = wnut_multiple_granularity(wnut, self.args)
-        tokenized_wnut_main = data_loader.data_
-        model = weighted_ensemble(data_loader.model_dict, self.args)
-        for granularity in self.args.granularities:
-            model_name = self.args.granularities_model[granularity]
-            tokenized_wnut = tokenized_wnut_main[model_name]
+    # def _train(self):
+    #     wnut = load_dataset("wnut_17")
+    #     print(self.args.model_names)
+    #     data_loader = wnut_multiple_granularity(wnut, self.args)
+    #     tokenized_wnut_main = data_loader.data_
+    #     model = weighted_ensemble(data_loader.model_dict, self.args)
+    #     for granularity in self.args.granularities:
+    #         model_name = self.args.granularities_model[granularity]
+    #         tokenized_wnut = tokenized_wnut_main[model_name]
 
-            tokenizer = AutoTokenizer.from_pretrained(model_name, add_prefix_space=self.args.prefix_space) ## changed here
-            data_collator = DataCollatorForTokenClassification(tokenizer=tokenizer)
+    #         tokenizer = AutoTokenizer.from_pretrained(model_name, add_prefix_space=self.args.prefix_space) ## changed here
+    #         data_collator = DataCollatorForTokenClassification(tokenizer=tokenizer)
 
-            criterion = nn.BCEWithLogitsLoss().to(self.args.device)
+    #         criterion = nn.BCEWithLogitsLoss().to(self.args.device)
 
-            if not self.args.train: 
-                optimizer = None
-                scheduler = None
-            else: 
-                no_weight_decay = lambda param_name: any(
-                    no_decay_name in param_name for no_decay_name in ['LayerNorm', 'layer_norm', 'bias']
-                )
-                optimizer = optim.AdamW(
-                    [
-                        {'params': [param for param_name, param in model.named_parameters() if not no_weight_decay(param_name)]}, 
-                        {'params': [param for param_name, param in model.named_parameters() if no_weight_decay(param_name)], 'weight_decay': 0}
-                    ], 
-                    lr=self.args.lr, 
-                    betas=(0.9, 0.999), 
-                    eps=1E-6, 
-                    weight_decay=0.01
-                )
-                train_steps = self.args.n_epochs * data_loader.__len__
-                warmup_steps = self.args.warmup_proportion * train_steps
-                scheduler = optim.lr_scheduler.LambdaLR(
-                    optimizer, 
-                    lambda global_step: max(
-                        0, 
-                        min(global_step / warmup_steps, 1 - (global_step - warmup_steps) / train_steps)
-                    ) # slanted triangular lr
-                )
+    #         if not self.args.train: 
+    #             optimizer = None
+    #             scheduler = None
+    #         else: 
+    #             no_weight_decay = lambda param_name: any(
+    #                 no_decay_name in param_name for no_decay_name in ['LayerNorm', 'layer_norm', 'bias']
+    #             )
+    #             optimizer = optim.AdamW(
+    #                 [
+    #                     {'params': [param for param_name, param in model.named_parameters() if not no_weight_decay(param_name)]}, 
+    #                     {'params': [param for param_name, param in model.named_parameters() if no_weight_decay(param_name)], 'weight_decay': 0}
+    #                 ], 
+    #                 lr=self.args.lr, 
+    #                 betas=(0.9, 0.999), 
+    #                 eps=1E-6, 
+    #                 weight_decay=0.01
+    #             )
+    #             train_steps = self.args.n_epochs * data_loader.__len__
+    #             warmup_steps = self.args.warmup_proportion * train_steps
+    #             scheduler = optim.lr_scheduler.LambdaLR(
+    #                 optimizer, 
+    #                 lambda global_step: max(
+    #                     0, 
+    #                     min(global_step / warmup_steps, 1 - (global_step - warmup_steps) / train_steps)
+    #                 ) # slanted triangular lr
+    #             )
 
-            estimator = weighted_estimater( # TODO: change to your estimator!
-                model, 
-                tokenizer, 
-                criterion, 
-                optimizer=optimizer, 
-                scheduler=scheduler, 
-                logger=self.log, 
-                writer=self.writer, 
-                pred_thold=None, 
-                device=self.args.device, 
-                # add other hyperparameters here
-            )
-            print('Running the model...')
-            if self.args.train: 
-                self.logger.info('Training...')
-                estimator.train(self.args, tokenized_wnut['train'], tokenized_wnut['validation'])
-                probs, _ = estimator.test(tokenized_wnut['test'])
-                assert probs.shape[0] == len(tokenized_wnut['test']) 
+    #         estimator = weighted_estimater( # TODO: change to your estimator!
+    #             model, 
+    #             tokenizer, 
+    #             criterion, 
+    #             optimizer=optimizer, 
+    #             scheduler=scheduler, 
+    #             logger=self.log, 
+    #             writer=self.writer, 
+    #             pred_thold=None, 
+    #             device=self.args.device, 
+    #             # add other hyperparameters here
+    #         )
+    #         print('Running the model...')
+    #         if self.args.train: 
+    #             self.logger.info('Training...')
+    #             estimator.train(self.args, tokenized_wnut['train'], tokenized_wnut['validation'])
+    #             probs, _ = estimator.test(tokenized_wnut['test'])
+    #             assert probs.shape[0] == len(tokenized_wnut['test']) 
             
 
 
