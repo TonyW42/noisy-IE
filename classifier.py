@@ -100,8 +100,10 @@ def train(args):
     print(" ====== parameters? ========")
     for name, p in model.named_parameters():
         print(name)
-    params = [model.model_dict[name].parameters() for name in model.model_dict]
-    params.append(model.parameters())
+    params = [p for p in model.parameters()]
+    for name in model.model_dict:
+      for p in model.model_dict[name].parameters():
+        params.append(p)
     optimizer = torch.optim.AdamW(params,lr=args.lr)
     trainloader, devloader, testloader = fetch_loaders(model_names, args) ## TODO: get data
     # trainloader, devloader, testloader = fetch_loaders2(model_names, args)
