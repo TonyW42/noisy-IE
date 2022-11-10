@@ -174,7 +174,8 @@ class BaseEstimator(object):
         assert self.optimizer is not None, 'Optimizer is required'
         assert hasattr(cfg, 'output_dir'), 'Output directory must be specified'
         make_if_not_exists(cfg.output_dir)
-        for _ in range(cfg.n_epochs): 
+        for i in range(cfg.n_epochs): 
+            print(f"Training epoch {i}")
             self._train_epoch(trainloader, devloader)
             self.epoch += 1
             checkpoint_path = os.path.join(cfg.output_dir, '{}.pt'.format(datetime.now().strftime('%m-%d_%H-%M')))
