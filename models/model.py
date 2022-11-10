@@ -418,14 +418,17 @@ class flat_MTL(nn.Module):
             attn_output = hidden_states_all
 
         ## separate hidden states from the global attention output
+        ##################################################################
+        ######## SOURCE OF A bug 
         count = 0
         for model_name in self.model_dict: 
             input_info = input_info_dict[model_name]
             seq_len_model = input_info["input_ids"].shape[1]
             count_next = count + seq_len_model
             self.hidden_states_dict[model_name] = attn_output[:, count:count_next, :]
-            self.logits_dict[model_name] = nn.functional.softmax(self.lin_layer_dict[model_name](self.hidden_states_dict[model_name]), dim=-1)
+            self.logits_dict[model_name] = self.lin_layer_dict[model_name](self.hidden_states_dict[model_name])
             count += seq_len_model
+        #####################################################################
     
         return self.logits_dict ## {model_name: logit}
             
@@ -453,6 +456,7 @@ class baseline_classifier(BaseEstimator):
         logits = self.model(
             data = data
         )
+        ## softmax the logit before loss! 
         loss = self.criterion(logits.view(-1, self.cfg.num_labels), data[self.cfg.word_model]["labels"].view(-1).to(self.cfg.device))
         if self.mode == "train":
             # loss = torch.tensor(0.00, requires_grad = True)
