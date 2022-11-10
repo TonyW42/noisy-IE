@@ -91,7 +91,7 @@ def train(args):
     model_dict = torch.nn.ModuleDict()
     for model_name in model_names:
         model_dict[model_name] = AutoModel.from_pretrained(model_name, num_labels=args.num_labels)
-    model = flat_MTL(model_dict = model_dict, args = args)
+    model = flat_MTL(model_dict = model_dict, args = args).to(args.device)
 
     criterion = torch.nn.ModuleDict()
     for model_name in model_names:
@@ -100,11 +100,11 @@ def train(args):
     print(" ====== parameters? ========")
     for name, p in model.named_parameters():
         print(name)
-    params = [p for p in model.parameters()]
-    for name in model.model_dict:
-      for p in model.model_dict[name].parameters():
-        params.append(p)
-    optimizer = torch.optim.AdamW(params,lr=args.lr)
+    # params = [p for p in model.parameters()]
+    # for name in model.model_dict:
+    #   for p in model.model_dict[name].parameters():
+    #     params.append(p)
+    optimizer = torch.optim.AdamW(model.parameters(),lr=args.lr)
     trainloader, devloader, testloader = fetch_loaders(model_names, args) ## TODO: get data
     # trainloader, devloader, testloader = fetch_loaders2(model_names, args)
     num_training_steps = args.n_epochs * len(trainloader)
@@ -139,7 +139,7 @@ def train(args):
     ## need to re-write the _eval() function for token classification. 
 
 def train_baseline(args):
-    model = baseline_model(args = args)
+    model = baseline_model(args = args).to(args.device)
     criterion = torch.nn.CrossEntropyLoss().to(args.device)
     optimizer = torch.optim.AdamW(model.parameters(),lr=args.lr)
     trainloader, devloader, testloader = fetch_loaders([args.word_model], args)

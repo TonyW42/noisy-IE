@@ -11,6 +11,7 @@ from torch import nn
 from collections import defaultdict
 from datasets import DatasetDict, Dataset
 import typing
+from transformers import AutoModel
 
 id2tag = {0: 'O',
           1: 'B-corporation',
@@ -221,9 +222,9 @@ class MTL_classifier(BaseEstimator):
             count = 0
             for model_name, logit in logits_dict.items():
                 if count == 0: 
-                    loss = self.criterion[model_name](logit.view(-1, self.cfg.num_labels), data[model_name]["labels"].view(-1))
+                    loss = self.criterion[model_name](logit.view(-1, self.cfg.num_labels), data[model_name]["labels"].view(-1).to(self.cfg.device))
                 else: 
-                    loss += self.criterion[model_name](logit.view(-1, self.cfg.num_labels), data[model_name]["labels"].view(-1))
+                    loss += self.criterion[model_name](logit.view(-1, self.cfg.num_labels), data[model_name]["labels"].view(-1).to(self.cfg.device))
                 count += 1
                 # if model_name == 'xlm-roberta-base':
                 #     loss_tmp1 = self.criterion[model_name](logit.view(-1, self.cfg.num_labels), data[model_name]["labels"].view(-1))
@@ -431,14 +432,15 @@ class flat_MTL(nn.Module):
             
 class baseline_model(nn.Module):
     def __init__(self, args):
-        super.__init__()
+        super().__init__()
         self.backbone = AutoModel.from_pretrained(args.word_model)
         self.lin = nn.Linear(768, args.num_labels)
+        self.args = args
 
     def forward(self, data):
         input_info = data[self.args.word_model]
         input_ids, attn_mask, token_type_ids = input_info["input_ids"], input_info["attention_mask"], input_info["labels"]
-        encoded = model(return_dict = True, output_hidden_states=True, input_ids=input_ids.to(self.args.device), attention_mask = attn_mask.to(self.args.device))
+        encoded = self.backbone(return_dict = True, output_hidden_states=True, input_ids=input_ids.to(self.args.device), attention_mask = attn_mask.to(self.args.device))
         hidden_states = encoded["hidden_states"][-1]
         logits = self.lin(hidden_states)
         return logits
@@ -449,12 +451,11 @@ class baseline_classifier(BaseEstimator):
     def step(self, data):
         self.optimizer.zero_grad()
         logits = self.model(
-            input_info_dict = data
+            data = data
         )
+        loss = self.criterion(logits.view(-1, self.cfg.num_labels), data[self.cfg.word_model]["labels"].view(-1).to(self.cfg.device))
         if self.mode == "train":
             # loss = torch.tensor(0.00, requires_grad = True)
-            count = 0
-            loss = self.criterion[self.args.word_model](logits.view(-1, self.cfg.num_labels), data[self.args.word_model]["labels"].view(-1))
             loss.backward()
             self.optimizer.step()
             # print("=========  step weight ===========")
@@ -477,13 +478,13 @@ class baseline_classifier(BaseEstimator):
             self.optimizer.zero_grad()
             return {
                 "loss" : loss.detach().cpu().item(), 
-                "logits" : logits.detach().cpu().item(), ## softmax this 
+                "logits" : logits.detach().cpu(), ## softmax this 
                 "label" : data[self.cfg.word_model]["labels"]
                     }
         elif self.mode in ("dev", "test"):
             return {
                 "loss" : loss.detach().cpu().item(), 
-                "logits" : logits.detach().cpu().item(), ## softmax this 
+                "logits" : logits.detach().cpu(), ## softmax this 
                 "label" : data[self.cfg.word_model]["labels"]
                     }
     
@@ -500,7 +501,7 @@ class baseline_classifier(BaseEstimator):
 
         for data in tbar: 
             ret_step = self.step(data)   ## y: [bs, seq_len]
-            loss, logits, y = ret_step['loss'], ret_step['logits_dict'], ret_step['label']
+            loss, logits, y = ret_step['loss'], ret_step['logits'], ret_step['label']
             # logit_word = logits_dict[self.cfg.word_model]
             # prob = torch.nn.functional.softmax(logit_word, dim=-1) ## softmax logit_word, [bs, seq_len, num_label] 
             pred = torch.argmax(logits, dim = -1) ## predicted, [bs, seq_len]
