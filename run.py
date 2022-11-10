@@ -56,6 +56,7 @@ if __name__ == '__main__':
     parser.add_argument('--word_model', type = str, default = "xlm-roberta-base")
     parser.add_argument('--num_att_layers', type = int, default = 6)
     parser.add_argument('--expr', type = str, default = "MTL")
+    parser.add_argument('--save', type = str, default = "true")
     
     parser.add_argument('--granularities_model', type=dict, 
                         default= {"character": "google/canine-s",

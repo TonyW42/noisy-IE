@@ -179,7 +179,8 @@ class BaseEstimator(object):
             self._train_epoch(trainloader, devloader)
             self.epoch += 1
             checkpoint_path = os.path.join(cfg.output_dir, '{}.pt'.format(datetime.now().strftime('%m-%d_%H-%M')))
-            self.save(checkpoint_path)
+            if cfg.save.lower() == "true": 
+                self.save(checkpoint_path)
             if self.logger is not None: 
                 self.logger.info('[CHECKPOINT]\t{}'.format(checkpoint_path))
 
