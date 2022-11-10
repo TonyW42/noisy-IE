@@ -395,7 +395,7 @@ class flat_MTL(nn.Module):
             input_info = input_info_dict[model_name]
             input_ids, attn_mask, token_type_ids = input_info["input_ids"], input_info["attention_mask"], input_info["labels"]
             ## get contexualized representation
-            encoded = model(return_dict = True, output_hidden_states=True, input_ids=input_ids, attention_mask = attn_mask)
+            encoded = model(return_dict = True, output_hidden_states=True, input_ids=input_ids.to(self.args.device), attention_mask = attn_mask.to(self.args.device))
             hidden_states = encoded["hidden_states"][-1]  ## [bs, seq_len, embed_size]
             ## TODO: add positional embbeding 
             hidden_states_all.append(hidden_states)
@@ -429,6 +429,121 @@ class flat_MTL(nn.Module):
         return self.logits_dict ## {model_name: logit}
             
             
+class baseline_model(nn.Module):
+    def __init__(self, args):
+        super.__init__()
+        self.backbone = AutoModel.from_pretrained(args.word_model)
+        self.lin = nn.Linear(768, args.num_labels)
+
+    def forward(self, data):
+        input_info = data[self.args.word_model]
+        input_ids, attn_mask, token_type_ids = input_info["input_ids"], input_info["attention_mask"], input_info["labels"]
+        encoded = model(return_dict = True, output_hidden_states=True, input_ids=input_ids.to(self.args.device), attention_mask = attn_mask.to(self.args.device))
+        hidden_states = encoded["hidden_states"][-1]
+        logits = self.lin(hidden_states)
+        return logits
+
+
+class baseline_classifier(BaseEstimator):
+
+    def step(self, data):
+        self.optimizer.zero_grad()
+        logits = self.model(
+            input_info_dict = data
+        )
+        if self.mode == "train":
+            # loss = torch.tensor(0.00, requires_grad = True)
+            count = 0
+            loss = self.criterion[self.args.word_model](logits.view(-1, self.cfg.num_labels), data[self.args.word_model]["labels"].view(-1))
+            loss.backward()
+            self.optimizer.step()
+            # print("=========  step weight ===========")
+            # print(list(self.model.parameters())[0].grad)
+            # print(self.model.attention_layers[1].in_proj_weight[0][:10])
+            # print(self.model.attention_layers[2].in_proj_weight[0][:10])
+            # print(self.model.attention_layers[3].in_proj_weight[0][:10])
+            # print(self.model.attention_layers[4].in_proj_weight[0][:10])
+            # print(self.model.attention_layers[5].in_proj_weight[0][:10])
+            # print("==================================")
+
+            # print(self.model.attention_layers[0].out_proj.weight[0][:10])
+            # print(self.model.attention_layers[1].out_proj.weight[0][:10])
+            # print(self.model.attention_layers[2].out_proj.weight[0][:10])
+            # print(self.model.attention_layers[3].out_proj.weight[0][:10])
+            # print(self.model.attention_layers[4].out_proj.weight[0][:10])
+            # print(self.model.attention_layers[5].out_proj.weight[0][:10])
+            if self.scheduler is not None:
+                self.scheduler.step()
+            self.optimizer.zero_grad()
+            return {
+                "loss" : loss.detach().cpu().item(), 
+                "logits" : logits.detach().cpu().item(), ## softmax this 
+                "label" : data[self.cfg.word_model]["labels"]
+                    }
+        elif self.mode in ("dev", "test"):
+            return {
+                "loss" : loss.detach().cpu().item(), 
+                "logits" : logits.detach().cpu().item(), ## softmax this 
+                "label" : data[self.cfg.word_model]["labels"]
+                    }
+    
+    def _eval(self, evalloader): 
+        self.model.eval()
+        tbar = tqdm(evalloader, dynamic_ncols=True)
+        eval_loss = []
+        ys = []
+        preds = []
+
+        if self.evaluate_metric is None:
+            self.evaluate_metric = dict()
+            self.evaluate_metric['f1'] = evaluate.load("f1")
+
+        for data in tbar: 
+            ret_step = self.step(data)   ## y: [bs, seq_len]
+            loss, logits, y = ret_step['loss'], ret_step['logits_dict'], ret_step['label']
+            # logit_word = logits_dict[self.cfg.word_model]
+            # prob = torch.nn.functional.softmax(logit_word, dim=-1) ## softmax logit_word, [bs, seq_len, num_label] 
+            pred = torch.argmax(logits, dim = -1) ## predicted, [bs, seq_len]
+            if self.mode == 'dev': 
+                # tbar.set_description('dev_loss - {:.4f}'.format(loss))
+                # eval_loss.append(loss)
+                ys.append(y)
+            preds.append(pred) ## use pred for F1 and change how you append 
+        # loss = np.mean(eval_loss).item() if self.mode == 'dev' else None
+        # ys = np.concatenate(ys, axis=0) if self.mode == 'dev' else None
+        # probs = np.concatenate(probs, axis=0)
+        
+        if self.mode == 'dev':
+            flatten_ys, flatten_pred = np.array([]), np.array([])
+            for y_ in ys:
+                flatten_ys = np.append(flatten_ys, np.array(y_).ravel())
+            for p_ in preds:
+                flatten_pred = np.append(flatten_pred, np.array(p_).ravel())
+            
+            eval_ys, eval_pred = np.array([]), np.array([])
+            for y_, p_ in zip(flatten_ys, flatten_pred):
+                if y_ != -100:
+                    eval_ys = np.append(eval_ys, y_)
+                    eval_pred = np.append(eval_pred, p_)
+
+            results = self.evaluate_metric['f1'].compute(predictions=eval_pred, references=eval_ys, average='macro')
+            print(f"====== F1 result: {results}======")
+
+            # if self.writer is not None: 
+            #     self.writer.add_scalar('dev/loss', loss, self.dev_step)
+            #     self.writer.add_scalar('dev/macro/auc', macro_auc, self.dev_step)
+            #     self.writer.add_scalar('dev/micro/auc', micro_auc, self.dev_step)
+            #     if self.pred_thold is not None: 
+            #         yhats = (probs > self.pred_thold).astype(int)
+            #         macros = precision_recall_fscore_support(ys, yhats, average='macro')
+            #         self.writer.add_scalar('dev/macro/precision', macros[0], self.dev_step)
+            #         self.writer.add_scalar('dev/macro/recall', macros[1], self.dev_step)
+            #         self.writer.add_scalar('dev/macro/f1', macros[2], self.dev_step)
+            #         micros = precision_recall_fscore_support(ys, yhats, average='micro')
+            #         self.writer.add_scalar('dev/micro/precision', micros[0], self.dev_step)
+            #         self.writer.add_scalar('dev/micro/recall', micros[1], self.dev_step)
+            #         self.writer.add_scalar('dev/micro/f1', micros[2], self.dev_step)
+        return eval_pred, eval_ys
     
 if __name__ == '__main__':
     ## add arguments 

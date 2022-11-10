@@ -138,3 +138,31 @@ def train(args):
     ## Note: could evaluate using seqeval in the estimator's _eval() function 
     ## need to re-write the _eval() function for token classification. 
 
+def train_baseline(args):
+    model = baseline_model(args = args)
+    criterion = torch.nn.CrossEntropyLoss().to(args.device)
+    optimizer = torch.optim.AdamW(model.parameters(),lr=args.lr)
+    trainloader, devloader, testloader = fetch_loaders([args.word_model], args)
+    num_training_steps = args.n_epochs * len(trainloader)
+    scheduler = get_scheduler(
+        "linear",
+        optimizer=optimizer,
+        num_warmup_steps=0,
+        num_training_steps=num_training_steps
+    )
+    logger = None
+    classifier = baseline_classifier(
+        model = model, 
+        cfg = args,
+        criterion = criterion, 
+        optimizer = optimizer, 
+        scheduler = scheduler, 
+        device = args.device,
+        logger = logger 
+    )
+    if args.mode == "train":
+        classifier.train(args, trainloader, devloader)
+
+    if args.mode == "test":
+        pass 
+
