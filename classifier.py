@@ -128,7 +128,7 @@ def train(args):
     )
 
     if args.mode == "train":
-        classifier.train(args, trainloader, devloader)
+        classifier.train(args, trainloader, testloader)
 
     if args.mode == "test":
         pass 
@@ -161,7 +161,7 @@ def train_baseline(args):
         logger = logger 
     )
     if args.mode == "train":
-        classifier.train(args, trainloader, devloader)
+        classifier.train(args, trainloader, testloader)
 
     if args.mode == "test":
         pass 
