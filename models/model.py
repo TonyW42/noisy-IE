@@ -12,6 +12,7 @@ from collections import defaultdict
 from datasets import DatasetDict, Dataset
 import typing
 from transformers import AutoModel
+import torch.nn.functional as F
 
 id2tag = {0: 'O',
           1: 'B-corporation',
@@ -549,7 +550,87 @@ class baseline_classifier(BaseEstimator):
             #         self.writer.add_scalar('dev/micro/recall', micros[1], self.dev_step)
             #         self.writer.add_scalar('dev/micro/f1', micros[2], self.dev_step)
         return eval_pred, eval_ys
+
+class self_attention(nn.Module):
+    def __init__(self, emb_size, dropout_p = 0.1, eps = 1e-12):
+        super().__init__()
+        self.emb_size = emb_size
+        ## k, v, q projection
+        self.query_lin = nn.Linear(emb_size, emb_size)
+        self.key_lin = nn.Linear(emb_size, emb_size)
+        self.value_lin = nn.Linear(emb_size, emb_size)
+        self.dropout = nn.Dropout(p = dropout_p)  ## add dropout if you want
+        # ## output projection
+        # self.out_proj = nn.Linear(emb_size)
+        # self.layerNorm = nn.LayerNorm(emb_size, eps = eps)
+        # self.out_dropout = nn.Dropout(p = dropout_p)
     
+    def __forward__(self, query, key, value):
+        ## in-projection, [bs, seq_len, emb_size]
+        q = self.query_lin(query) 
+        k = self.key_lin(key)
+        v = self.value_lin(value)
+        ## dot-product attention
+        attention_weights = F.softmax(
+            torch.matmul(q, k.transpose(1, 2)) / (k.shape[2]**0.5),
+            dim = -1)   ## [bs, seq_len, seq_len]
+        attention_output = torch.matmul(attention_weights, v)
+        return {
+            "attn_weights" : attention_weights,
+            "attn_output" : attention_output
+        }
+
+class BertLayer(nn.Module):
+    def __init__(self, emb_size, intermeidate_size = None, dropout_p = 0.1, eps = 1e-12):
+        super().__init__()
+        ## attention layer 
+        self.attention_layer = self_attention(emb_size = emb_size, dropout_p = dropout_p)
+        self.attention_dense = nn.Linear(emb_size, emb_size)
+        self.attention_layer_norm = nn.LayerNorm(emb_size, eps = eps)
+        self.attention_dropout = nn.Dropout(p = dropout_p)
+        ## intermediate layer 
+        if intermeidate_size is None: 
+            intermeidate_size = emb_size
+        self.interm_dense = nn.Linear(emb_size, intermeidate_size)
+        self.interm_af = nn.GELU()
+        ## output 
+        self.out_dense = nn.Linear(intermeidate_size, emb_size)
+        self.out_layer_norm =  nn.LayerNorm(emb_size, eps = eps)
+        self.out_dropout = nn.Dropout(dropout_p)
+    
+    def add_norm(self, inputs, output, dense_layer, dropout, ln_layer):
+        output_dense = dense_layer(output)
+        droped_out = dropout(output_dense)
+        result = ln_layer(droped_out + inputs)
+        return result
+
+    def forward(self, hidden_states):
+        ## attention
+        attention_out = self.self_attention(hidden_states)["attn_output"]
+        ## add-norm 
+        attention_normed = self.add_norm(hidden_states, attention_out, 
+                                         self.attention_dense, self.attention_dropout,
+                                         self.attention_layer_norm)
+        ## intermediate 
+        forward_linear = self.interm_dense(attention_normed)
+        forward_act = self.interm_af(forward_linear)
+        ## output 
+        out = self.add_norm(attention_normed, forward_act, self.out_dense,
+                            self.out_dropout, self.out_layer_norm)
+        return out 
+    
+
+
+
+        
+
+
+
+
+
+
+
+
 if __name__ == '__main__':
     ## add arguments 
     parser = argparse.ArgumentParser()
