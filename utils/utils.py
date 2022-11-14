@@ -98,3 +98,20 @@ def scaled_dot_product_attention(query, key, value):
     result = torch.matmul(query, key_transpose)
 
 
+def get_batch_ids(n, bs):
+    remaining = np.arrange(n).tolist()
+    bs_ids = []
+    remaining_len = len(remaining)
+    while remaining_len >= bs:
+        sampled = random.sample(remaining)
+        bs_ids.extend(sampled)
+        for s in sampled: remaining.remove(s)
+        remaining_len = len(remaining)
+    if remaining_len != 0: bs_ids.extend(remaining)
+    return bs_ids ## [[ids for batch 1], [ids for batch 2], ...]
+
+
+    
+
+
+
