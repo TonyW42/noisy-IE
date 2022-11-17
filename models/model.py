@@ -433,7 +433,80 @@ class flat_MTL(nn.Module):
     
         return self.logits_dict ## {model_name: logit}
             
-            
+class flat_MTL_for_MLM(nn.Module):
+    def __init__(self, model_dict, args):
+        super().__init__()  ## delete this ??
+        self.model_dict = model_dict
+        self.args = args
+        self.lin_layer_dict = nn.ModuleDict()
+        self.num_att_layers = args.num_att_layers
+        self.attention_layers = nn.ModuleList(
+            [nn.MultiheadAttention(
+            embed_dim = self.args.embed_size_dict[self.args.word_model],
+            num_heads = 1,
+            batch_first=True) for _ in range(self.num_att_layers)]
+        )
+        # self.attention_layer = nn.MultiheadAttention(
+        #     embed_dim = self.args.embed_size_dict[self.args.word_model],
+        #     num_heads = 1,
+        #     batch_first=True)
+        
+        for model_name in model_dict:
+            # add one linear layer per model
+            lin_layer = nn.Linear(model_dict[model_name].config.hidden_size, model_dict[model_name].config.vocab_size)
+            self.lin_layer_dict[model_name] = lin_layer
+    
+    def forward(self, input_info_dict):
+        hidden_states_all = [] ## [num_model, bs, seq_len, embed_size]
+        self.logits_dict = dict()
+        self.hidden_states_dict = dict()
+        for model_name in self.model_dict:
+            ## get information
+            model = self.model_dict[model_name]
+            input_info = input_info_dict[model_name]
+            input_ids, attn_mask, token_type_ids = input_info["input_ids"], input_info["attention_mask"], input_info["labels"]
+            ## get contexualized representation
+            encoded = model(return_dict = True, output_hidden_states=True, input_ids=input_ids.to(self.args.device), attention_mask = attn_mask.to(self.args.device))
+            hidden_states = encoded["hidden_states"][-1]  ## [bs, seq_len, embed_size]
+            ## TODO: add positional embbeding 
+            hidden_states_all.append(hidden_states)
+        hidden_states_all = torch.cat(hidden_states_all, dim = 1)
+        if self.num_att_layers > 0:
+            attn_output, attn_output_weights = self.attention_layers[0](
+                query = hidden_states_all, 
+                key = hidden_states_all, 
+                value = hidden_states_all
+            )
+
+            for i in range(1, self.num_att_layers):
+                attn_output, attn_output_weights = self.attention_layers[i](
+                query = attn_output, 
+                key = attn_output, 
+                value = attn_output
+            )
+        else:
+            attn_output = hidden_states_all
+
+        ## separate hidden states from the global attention output
+        ##################################################################
+        ######## SOURCE OF A bug 
+        count = 0
+        for model_name in self.model_dict: 
+            input_info = input_info_dict[model_name]
+            seq_len_model = input_info["input_ids"].shape[1]
+            count_next = count + seq_len_model
+            self.hidden_states_dict[model_name] = attn_output[:, count:count_next, :]
+            self.logits_dict[model_name] = self.lin_layer_dict[model_name](self.hidden_states_dict[model_name])
+            count += seq_len_model
+        #####################################################################
+    
+        return self.logits_dict ## {model_name: logit}
+
+
+
+
+
+
 class baseline_model(nn.Module):
     def __init__(self, args):
         super().__init__()
