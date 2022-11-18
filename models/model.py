@@ -371,7 +371,10 @@ class flat_MTL(nn.Module):
         self.args = args
         self.lin_layer_dict = nn.ModuleDict()
         self.num_att_layers = args.num_att_layers
-        self.is_bert_layers = True
+        if self.args.layer_type == 'att':
+            self.is_bert_layers = False
+        else:
+            self.is_bert_layers = True
 
         if self.is_bert_layers:
             self.bert_layers = nn.ModuleList(
