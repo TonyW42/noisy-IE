@@ -693,6 +693,128 @@ class BertLayer(nn.Module):
         return out 
     
 
+class sequential_MTL(nn.Module):
+    def __init__(self, model_dict, args):
+        super().__init__()
+        self.model_dict = model_dict
+        self.args = args
+
+        for model_name in model_dict:
+            # add one linear layer per model
+            lin_layer = nn.Linear(model_dict[model_name].config.hidden_size, self.args.num_labels)
+            self.lin_layer_dict[model_name] = lin_layer
+        
+    def forward(self, data):
+        prob = None
+        prob_dict = dict()
+        for model_name in self.model_dict:
+            model = self.model_dict[model_name]
+            input_info = data[model_name]
+            input_ids, attn_mask, token_type_ids = input_info["input_ids"], input_info["attention_mask"], input_info["labels"]
+            ## get contexualized representation
+            encoded = model(return_dict = True, output_hidden_states=True, input_ids=input_ids.to(self.args.device), attention_mask = attn_mask.to(self.args.device))
+            hidden_states = encoded["hidden_states"][-1]  ## [bs, seq_len, embed_size]
+            logit = self.lin_layer_dict[model_name](hidden_states)
+            logit_prob = F.softmax(logit, dim = -1) ##Log softmax???
+            prob_dict[model_name] = logit_prob
+            if prob is None: 
+                prob = logit_prob 
+            else:
+                prob = torch.add(prob, logit_prob)
+        return prob, prob_dict
+    
+
+class sequential_classifier(BaseEstimator):
+
+    def step(self, data):
+        # self.optimizer.zero_grad()
+        prob, prob_dict = self.model(
+            data = data
+        )
+        if self.mode == "train":
+            self.optimizer.zero_grad()
+            count = 0
+            for model_name, probs in prob_dict.item():
+                if count == 0:
+                    loss = self.criterion[model_name](probs, data[model_name]["labels"])
+                    loss.backward()
+                    self.optimizer.step()
+                    if self.scheduler is not None:
+                        self.scheduler.step()
+                    count += 1
+                else:
+                    
+
+            
+            loss.backward()
+            self.optimizer.step()
+            
+            if self.scheduler is not None:
+                self.scheduler.step()
+            for key, val in logits_dict.items():
+                logits_dict[key] = val.detach().cpu()
+            self.optimizer.zero_grad()
+            return {
+                "loss" : loss.detach().cpu().item(), 
+                "logits_dict" : logits_dict, ## softmax this 
+                "label" : data[self.cfg.word_model]["labels"]
+                    }
+        elif self.mode in ("dev", "test"):
+            for key, val in logits_dict.items():
+                logits_dict[key] = val.detach().cpu()
+            return {
+                "loss" : None, 
+                "logits_dict" : logits_dict,
+                "label" : data[self.cfg.word_model]["labels"]
+                }
+    
+    def _eval(self, evalloader): 
+        self.model.eval()
+        tbar = tqdm(evalloader, dynamic_ncols=True)
+        eval_loss = []
+        ys = []
+        preds = []
+
+        if self.evaluate_metric is None:
+            self.evaluate_metric = dict()
+            self.evaluate_metric['f1'] = evaluate.load("f1")
+
+        for data in tbar: 
+            ret_step = self.step(data)   ## y: [bs, seq_len]
+            loss, logits_dict, y = ret_step['loss'], ret_step['logits_dict'], ret_step['label']
+            logit_word = logits_dict[self.cfg.word_model]
+            # prob = torch.nn.functional.softmax(logit_word, dim=-1) ## softmax logit_word, [bs, seq_len, num_label] 
+            pred = torch.argmax(logit_word, dim = -1) ## predicted, [bs, seq_len]
+            if self.mode == 'dev': 
+                # tbar.set_description('dev_loss - {:.4f}'.format(loss))
+                # eval_loss.append(loss)
+                ys.append(y)
+            preds.append(pred) ## use pred for F1 and change how you append 
+        # loss = np.mean(eval_loss).item() if self.mode == 'dev' else None
+        # ys = np.concatenate(ys, axis=0) if self.mode == 'dev' else None
+        # probs = np.concatenate(probs, axis=0)
+        
+        if self.mode == 'dev':
+            flatten_ys, flatten_pred = np.array([]), np.array([])
+            for y_ in ys:
+                flatten_ys = np.append(flatten_ys, np.array(y_).ravel())
+            for p_ in preds:
+                flatten_pred = np.append(flatten_pred, np.array(p_).ravel())
+            
+            eval_ys, eval_pred = np.array([]), np.array([])
+            for y_, p_ in zip(flatten_ys, flatten_pred):
+                if y_ != -100:
+                    eval_ys = np.append(eval_ys, y_)
+                    eval_pred = np.append(eval_pred, p_)
+
+            results = self.evaluate_metric['f1'].compute(predictions=eval_pred, references=eval_ys, average='macro')
+            print(f"====== F1 result: {results}======")
+
+            
+        return eval_pred, eval_ys
+
+
+
 
 
         
