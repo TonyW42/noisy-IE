@@ -46,21 +46,21 @@ if __name__ == '__main__':
     parser.add_argument('--weight_decay', type=float, default=0)
     parser.add_argument('--prefix_space', type=bool, default=True)
     parser.add_argument('--num_labels', type=int, default=13)
-    parser.add_argument('--granularities', type=str, default="subword_50k,subword_30k")# add cahracter
+    parser.add_argument('--granularities', type=str, default="subword_50k,subword_30k")# add character
     parser.add_argument('--add_space_for_char', type=bool, default=True)
     parser.add_argument('--to_char_method', type=str, default="inherit")
     parser.add_argument('--mode', type=str, default="train")
     parser.add_argument('--device', type=str, default=None)
     parser.add_argument('--ensemble_method', type=str, default="default")
-    parser.add_argument('--model_list', type = str, default = "bert-base-cased|xlm-roberta-base")
-    parser.add_argument('--word_model', type = str, default = "xlm-roberta-base")
+    parser.add_argument('--model_list', type = str, default = "roberta-base|bert-base-cased")
+    parser.add_argument('--word_model', type = str, default = "roberta-base")
     parser.add_argument('--num_att_layers', type = int, default = 6)
     parser.add_argument('--expr', type = str, default = "MTL")
     parser.add_argument('--save', type = str, default = "true")
     
     parser.add_argument('--granularities_model', type=dict, 
                         default= {"character": "google/canine-s",
-                                "subword_50k": "xlm-roberta-base",
+                                "subword_50k": "roberta-base",
                                 "subword_30k" : "bert-base-cased"})
 
     parser.add_argument('--embed_size_dict', type=dict, 
