@@ -240,6 +240,7 @@ class MTL_classifier(BaseEstimator):
             self.optimizer.step()
             # print("=========  step weight ===========")
             # print(list(self.model.parameters())[0].grad)
+            # print(self.model.bert_layers[0].self_attention.query_lin.weight)
             # print(self.model.attention_layers[1].in_proj_weight[0][:10])
             # print(self.model.attention_layers[2].in_proj_weight[0][:10])
             # print(self.model.attention_layers[3].in_proj_weight[0][:10])
@@ -287,8 +288,8 @@ class MTL_classifier(BaseEstimator):
             ret_step = self.step(data)   ## y: [bs, seq_len]
             loss, logits_dict, y = ret_step['loss'], ret_step['logits_dict'], ret_step['label']
             logit_word = logits_dict[self.cfg.word_model]
-            # prob = torch.nn.functional.softmax(logit_word, dim=-1) ## softmax logit_word, [bs, seq_len, num_label] 
-            pred = torch.argmax(logit_word, dim = -1) ## predicted, [bs, seq_len]
+            prob = torch.nn.functional.softmax(logit_word, dim=-1) ## softmax logit_word, [bs, seq_len, num_label] 
+            pred = torch.argmax(prob, dim = -1) ## predicted, [bs, seq_len]
             if self.mode == 'dev': 
                 # tbar.set_description('dev_loss - {:.4f}'.format(loss))
                 # eval_loss.append(loss)
@@ -331,37 +332,36 @@ class MTL_classifier(BaseEstimator):
         return eval_pred, eval_ys
 
 
-# class weighted_ensemble(BaseClassifier):
-#     def __init__(self, model_dict, args):
-#         super().__init__()
-#         self.model_dict = model_dict
-#         total_embed_size = 0
-#         for model_name in model_dict:
-#             total_embed_size += self.args.embed_size_dict[model_name]
-#         self.lin1 = nn.Linear(total_embed_size, args.num_labels)
-#         self.args = args
+class weighted_ensemble(BaseClassifier):
+    def __init__(self, model_dict, args):
+        super().__init__()
+        self.model_dict = model_dict
+        total_embed_size = 0
+        for model_name in model_dict:
+            total_embed_size += self.args.embed_size_dict[model_name]
+        self.lin1 = nn.Linear(total_embed_size, args.num_labels)
+        self.args = args
     
-#     def forward(self, input_info_dict):
-#         hidden_states_all = [] ## [num_model, bs, seq_len, embed_size]
-#         for model_name in self.model_dict:
-#             model = self.model_dict[model_name]
-#             input_info = input_info_dict[model_name]
-#             input_ids, attn_mask, token_type_ids = input_info["input_ids"], input_info["attention_mask"], input_info["ner_tags"]
-#             encoded = model(input_ids = input_ids, 
-#                             attention_mask = attn_mask,
-#                             token_type_ids = token_type_ids)
-#             hidden_states = encoded[0]  ## [bs, seq_len, embed_size]
-#             hidden_states_all.append(hidden_states) 
-#             ##########################
-#             ## make sure that seq_len is aligned fr subword/character model
-#             ###########################
+    def forward(self, input_info_dict):
+        hidden_states_all = [] ## [num_model, bs, seq_len, embed_size]
+        for model_name in self.model_dict:
+            model = self.model_dict[model_name]
+            input_info = input_info_dict[model_name]
+            input_ids, attn_mask, token_type_ids = input_info["input_ids"], input_info["attention_mask"], input_info["ner_tags"]
+            encoded = model(input_ids = input_ids, 
+                            attention_mask = attn_mask,
+                            token_type_ids = token_type_ids)
+            hidden_states = encoded[0]  ## [bs, seq_len, embed_size]
+            hidden_states_all.append(hidden_states) 
+            ##########################
+            ## make sure that seq_len is aligned fr subword/character model
+            ###########################
 
 
 
-#         hidden_states_cat = torch.cat(hidden_states_all, dim = 3)
-#         logits = self.lin1(hidden_states_cat)
-#         return logits ## [bs, seq_len, num_labels]
-
+        hidden_states_cat = torch.cat(hidden_states_all, dim = 3)
+        logits = self.lin1(hidden_states_cat)
+        return logits ## [bs, seq_len, num_labels]
 
 
 class flat_MTL(nn.Module):
@@ -371,12 +371,24 @@ class flat_MTL(nn.Module):
         self.args = args
         self.lin_layer_dict = nn.ModuleDict()
         self.num_att_layers = args.num_att_layers
-        self.attention_layers = nn.ModuleList(
-            [nn.MultiheadAttention(
-            embed_dim = self.args.embed_size_dict[self.args.word_model],
-            num_heads = 1,
-            batch_first=True) for _ in range(self.num_att_layers)]
-        )
+        if self.args.layer_type == 'att':
+            self.is_bert_layers = False
+        else:
+            self.is_bert_layers = True
+
+        if self.is_bert_layers:
+            self.bert_layers = nn.ModuleList(
+            [BertLayer(emb_size = self.args.embed_size_dict[self.args.word_model]) for _ in range(self.num_att_layers)]
+            )
+        else:
+            self.attention_layers = nn.ModuleList(
+                [nn.MultiheadAttention(
+                embed_dim = self.args.embed_size_dict[self.args.word_model],
+                num_heads = 1,
+                batch_first=True) for _ in range(self.num_att_layers)]
+            )
+
+        
         # self.attention_layer = nn.MultiheadAttention(
         #     embed_dim = self.args.embed_size_dict[self.args.word_model],
         #     num_heads = 1,
@@ -397,24 +409,32 @@ class flat_MTL(nn.Module):
             input_info = input_info_dict[model_name]
             input_ids, attn_mask, token_type_ids = input_info["input_ids"], input_info["attention_mask"], input_info["labels"]
             ## get contexualized representation
+            # print(input_ids.shape)
             encoded = model(return_dict = True, output_hidden_states=True, input_ids=input_ids.to(self.args.device), attention_mask = attn_mask.to(self.args.device))
             hidden_states = encoded["hidden_states"][-1]  ## [bs, seq_len, embed_size]
             ## TODO: add positional embbeding 
             hidden_states_all.append(hidden_states)
         hidden_states_all = torch.cat(hidden_states_all, dim = 1)
-        if self.num_att_layers > 0:
-            attn_output, attn_output_weights = self.attention_layers[0](
-                query = hidden_states_all, 
-                key = hidden_states_all, 
-                value = hidden_states_all
-            )
 
-            for i in range(1, self.num_att_layers):
-                attn_output, attn_output_weights = self.attention_layers[i](
-                query = attn_output, 
-                key = attn_output, 
-                value = attn_output
-            )
+        if self.num_att_layers > 0:
+            if self.is_bert_layers:
+                attn_output = self.bert_layers[0](hidden_states_all)
+                
+                for i in range(1, self.num_att_layers):
+                    attn_output = self.bert_layers[i](hidden_states_all)['attn_output']
+            else:
+                attn_output, attn_output_weights = self.attention_layers[0](
+                    query = hidden_states_all, 
+                    key = hidden_states_all, 
+                    value = hidden_states_all
+                )
+
+                for i in range(1, self.num_att_layers):
+                    attn_output, attn_output_weights = self.attention_layers[i](
+                    query = attn_output, 
+                    key = attn_output, 
+                    value = attn_output
+                )
         else:
             attn_output = hidden_states_all
 
@@ -427,7 +447,7 @@ class flat_MTL(nn.Module):
             seq_len_model = input_info["input_ids"].shape[1]
             count_next = count + seq_len_model
             self.hidden_states_dict[model_name] = attn_output[:, count:count_next, :]
-            self.logits_dict[model_name] = self.lin_layer_dict[model_name](self.hidden_states_dict[model_name])
+            self.logits_dict[model_name] = nn.functional.softmax(self.lin_layer_dict[model_name](self.hidden_states_dict[model_name]), dim=-1)
             count += seq_len_model
         #####################################################################
     
@@ -536,9 +556,9 @@ class baseline_classifier(BaseEstimator):
             # loss = torch.tensor(0.00, requires_grad = True)
             loss.backward()
             self.optimizer.step()
-            # print("=========  step weight ===========")
+            print("=========  step weight ===========")
             # print(list(self.model.parameters())[0].grad)
-            # print(self.model.attention_layers[1].in_proj_weight[0][:10])
+            # print(self.model.attention_layers[0].self_attention.query_lin.weight)
             # print(self.model.attention_layers[2].in_proj_weight[0][:10])
             # print(self.model.attention_layers[3].in_proj_weight[0][:10])
             # print(self.model.attention_layers[4].in_proj_weight[0][:10])
@@ -638,7 +658,7 @@ class self_attention(nn.Module):
         # self.layerNorm = nn.LayerNorm(emb_size, eps = eps)
         # self.out_dropout = nn.Dropout(p = dropout_p)
     
-    def __forward__(self, query, key, value):
+    def forward(self, query, key, value):
         ## in-projection, [bs, seq_len, emb_size]
         q = self.query_lin(query) 
         k = self.key_lin(key)
@@ -657,7 +677,7 @@ class BertLayer(nn.Module):
     def __init__(self, emb_size, intermeidate_size = None, dropout_p = 0.1, eps = 1e-12):
         super().__init__()
         ## attention layer 
-        self.attention_layer = self_attention(emb_size = emb_size, dropout_p = dropout_p)
+        self.self_attention = self_attention(emb_size = emb_size, dropout_p = dropout_p)
         self.attention_dense = nn.Linear(emb_size, emb_size)
         self.attention_layer_norm = nn.LayerNorm(emb_size, eps = eps)
         self.attention_dropout = nn.Dropout(p = dropout_p)
@@ -679,7 +699,7 @@ class BertLayer(nn.Module):
 
     def forward(self, hidden_states):
         ## attention
-        attention_out = self.self_attention(hidden_states)["attn_output"]
+        attention_out = self.self_attention(hidden_states, hidden_states, hidden_states)["attn_output"]
         ## add-norm 
         attention_normed = self.add_norm(hidden_states, attention_out, 
                                          self.attention_dense, self.attention_dropout,
@@ -691,6 +711,7 @@ class BertLayer(nn.Module):
         out = self.add_norm(attention_normed, forward_act, self.out_dense,
                             self.out_dropout, self.out_layer_norm)
         return out 
+<<<<<<< HEAD
     
 
 class sequential_MTL(nn.Module):
@@ -817,6 +838,8 @@ class sequential_classifier(BaseEstimator):
 
 
 
+=======
+>>>>>>> 3ed8edca8ce0f8234e6adc063f9515a106534848
         
 
 
