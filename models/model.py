@@ -718,6 +718,8 @@ class sequential_MTL(nn.Module):
         super().__init__()
         self.model_dict = model_dict
         self.args = args
+        self.lin_layer_dict = nn.ModuleDict()
+        self.JSD = JSD()
 
         for model_name in model_dict:
             # add one linear layer per model
@@ -753,11 +755,15 @@ class sequential_classifier(BaseEstimator):
         )
         if self.mode == "train":
             count = 0
-            for model_name, probs in prob_dict.item():
+            for model_name, probs in prob_dict.items():
                 self.optimizer.zero_grad() ## clear grad at the start of every iteration
                 if count == 0:
-                    pred = probs.view(-1, self.args.num_labels)
+                    pred = probs.view(-1, self.cfg.num_labels)
                     ref = data[model_name]["labels"].view(-1).to(self.cfg.device)
+                    ## rule out padding 
+                    pred = pred[ref!=-100]
+                    ref = ref[ref!= -100]
+
                     loss = self.criterion[model_name](pred, ref)
                     loss.backward()
                     self.optimizer.step()
@@ -766,20 +772,30 @@ class sequential_classifier(BaseEstimator):
                     count += 1
 
                     ## residuals 
-                    ref_one_hot = F.one_hot(ref, num_classes = -1) ## self.cfg.num_labels
+                    ref_one_hot = F.one_hot(ref, num_classes = self.cfg.num_labels) ## [num_tokens_in_batch, num_labels]
                     residuals = torch.subtract(ref_one_hot, pred)
                 else:
-                    if self.JSD is None: self.JSD = JSD().to(self.cfg.device)  ## TODO: initialize this in classifier
-                    loss = JSD(probs, residuals)
+                    pred = probs.view(-1, self.cfg.num_labels)
+                    ref = data[model_name]["labels"].view(-1).to(self.cfg.device)
+
+                    pred = pred[ref!= -100]
+                    ref = ref[ref != -100]
+                    loss = self.JSD(pred, residuals)
 
                     loss.backward()
                     self.optimizer.step()
                     if self.scheduler is not None:
                         self.scheduler.step()
 
-                    residuals = torch.subtract(residuals, probs)
+                    residuals = torch.subtract(residuals, pred)
                     count += 1
-            return None ## TODO: Return     
+            pred = prob.view(-1, self.cfg.num_labels)
+            ref = data[self.cfg.word_model]["labels"].view(-1).to(self.cfg.device)
+            return {
+                "pred" : pred, 
+                "label" : ref,
+                "loss" : loss
+                }
             
         elif self.mode in ("dev", "test"):
             pred = prob.view(-1, self.cfg.num_labels)
@@ -811,6 +827,8 @@ class sequential_classifier(BaseEstimator):
             pred = torch.argmax(pred, dim = -1) ## predicted, [bs, seq_len]
             ys.append(labels)
             preds.append(pred)
+        preds = preds[ys != -100]
+        ys = ys[ys != -100]
         
         results = self.evaluate_metric['f1'].compute(predictions=preds, references=ys, average='macro')
         print(f"====== F1 result: {results}======")
@@ -828,6 +846,104 @@ class JSD(nn.Module):
     def forward(self, p, q):
         ## Note: p, q should already been log_softmaxed
         return self.KL(p, q) + self.KL(q, p)
+
+class base_model(nn.Module):
+    def __init__(self, name, args):
+        super().__init__()
+        self.backbone = AutoModel.from_pretrained(name)
+        self.lin = nn.Linear(self.backbone.config.hidden_size, args.num_labels)
+        self.args = args
+
+    def forward(self, input_ids, attn_mask):
+        encoded = self.backbone(return_dict = True, output_hidden_states=True, input_ids=input_ids, attention_mask = attn_mask)
+        hidden_states = encoded["hidden_states"][-1]
+        logits = self.lin(hidden_states)
+        prob = F.log_softmax(logits, dim = -1)
+        return prob
+
+class sequential_classifier_2(BaseEstimator):
+
+    def step(self, data):
+        # self.optimizer.zero_grad()
+        count = 0
+        num_models = len(self.model)
+        for model_name in self.model:
+            self.optimizer[model_name].zero_grad()
+            model = self.model[model_name]
+            input_info = data[model_name]
+            input_ids, attn_mask, token_type_ids = input_info["input_ids"], input_info["attention_mask"], input_info["labels"]
+            
+            prob = model(input_ids=input_ids.to(self.cfg.device), attn_mask = attn_mask.to(self.cfg.device))
+            pred = prob.view(-1, self.cfg.num_labels)
+            ref = data[model_name]["labels"].view(-1).to(self.cfg.device)
+
+            pred = pred[ref!=-100]  ## [#token, num_label]
+            ref = ref[ref!=-100]    ## [#token]
+
+            if self.mode == "train":
+                if count == 0:
+                    loss = self.criterion(pred, ref)
+                    ref_one_hot = F.one_hot(ref, num_classes = self.cfg.num_labels)
+                    residuals = torch.subtract(ref_one_hot, pred).detach()
+                    prob_sum = pred
+                else:
+                    loss = self.JSD(pred, residuals) 
+                    prob_sum = torch.add(prob_sum, pred)
+                    residuals = torch.subtract(residuals, pred).detach()
+                ## backprop
+                count += 1
+                retain_graph = not (count == num_models)
+                loss.backward(retain_graph = retain_graph)
+                self.optimizer[model_name].step()
+                if self.scheduler is not None: 
+                    self.scheduler[model_name].step()
+                self.optimizer[model_name].zero_grad() ## delete this 
+        
+        # print(ref)
+        # print(F.log_softmax(prob_sum))
+        loss = self.criterion(F.log_softmax(prob_sum, dim = -1), ref)
+        return {
+            "loss" : loss,
+            "pred" : torch.argmax(prob_sum, dim = -1), ## [#tokens]
+            "prob" : prob_sum, ## [#tokens, num_class]
+            "label" : ref   ## [#tokens]
+        }
+
+    def _eval(self, evalloader): 
+        self.model.eval()
+        tbar = tqdm(evalloader, dynamic_ncols=True)
+        eval_loss = []
+        ys = []
+        preds = []
+
+        if self.evaluate_metric is None:
+            self.evaluate_metric = dict()
+            self.evaluate_metric['f1'] = evaluate.load("f1")
+
+        for data in tbar: 
+            ret_step = self.step(data)   ## y: [bs, seq_len]
+            loss, pred, labels = ret_step['loss'], ret_step['pred'], ret_step['label']
+            ys.append(labels)
+            preds.append(pred)
+        
+        results = self.evaluate_metric['f1'].compute(predictions=preds, references=ys, average='macro')
+        print(f"====== F1 result: {results}======")
+
+            
+        return preds, ys
+
+    
+    
+            
+
+
+            
+
+
+
+
+        
+
 
 
         
