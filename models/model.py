@@ -735,7 +735,7 @@ class sequential_MTL(nn.Module):
             encoded = model(return_dict = True, output_hidden_states=True, input_ids=input_ids.to(self.args.device), attention_mask = attn_mask.to(self.args.device))
             hidden_states = encoded["hidden_states"][-1]  ## [bs, seq_len, embed_size]
             logit = self.lin_layer_dict[model_name](hidden_states)
-            logit_prob = F.softmax(logit, dim = -1) ##TODO: Log softmax???
+            logit_prob = F.log_softmax(logit, dim = -1) ##TODO: Log softmax???
             prob_dict[model_name] = logit_prob
             if prob is None: 
                 prob = logit_prob 
@@ -769,7 +769,7 @@ class sequential_classifier(BaseEstimator):
                     ref_one_hot = F.one_hot(ref, num_classes = -1) ## self.cfg.num_labels
                     residuals = torch.subtract(ref_one_hot, pred)
                 else:
-                    JSD = None  ## TODO: implement Jensen-Shannon divergence
+                    if self.JSD is None: self.JSD = JSD().to(self.cfg.device)  ## TODO: initialize this in classifier
                     loss = JSD(probs, residuals)
 
                     loss.backward()
@@ -816,10 +816,18 @@ class sequential_classifier(BaseEstimator):
         print(f"====== F1 result: {results}======")
 
             
-        return eval_pred, eval_ys
+        return preds, ys
 
 
 
+class JSD(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.KL = nn.KLDivLoss(reduction = "batchmean")
+    
+    def forward(self, p, q):
+        ## Note: p, q should already been log_softmaxed
+        return self.KL(p, q) + self.KL(q, p)
 
 
         
