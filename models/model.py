@@ -711,7 +711,6 @@ class BertLayer(nn.Module):
         out = self.add_norm(attention_normed, forward_act, self.out_dense,
                             self.out_dropout, self.out_layer_norm)
         return out 
-<<<<<<< HEAD
     
 
 class sequential_MTL(nn.Module):
@@ -736,7 +735,7 @@ class sequential_MTL(nn.Module):
             encoded = model(return_dict = True, output_hidden_states=True, input_ids=input_ids.to(self.args.device), attention_mask = attn_mask.to(self.args.device))
             hidden_states = encoded["hidden_states"][-1]  ## [bs, seq_len, embed_size]
             logit = self.lin_layer_dict[model_name](hidden_states)
-            logit_prob = F.softmax(logit, dim = -1) ##Log softmax???
+            logit_prob = F.softmax(logit, dim = -1) ##TODO: Log softmax???
             prob_dict[model_name] = logit_prob
             if prob is None: 
                 prob = logit_prob 
@@ -753,40 +752,46 @@ class sequential_classifier(BaseEstimator):
             data = data
         )
         if self.mode == "train":
-            self.optimizer.zero_grad()
             count = 0
             for model_name, probs in prob_dict.item():
+                self.optimizer.zero_grad() ## clear grad at the start of every iteration
                 if count == 0:
-                    loss = self.criterion[model_name](probs, data[model_name]["labels"])
+                    pred = probs.view(-1, self.args.num_labels)
+                    ref = data[model_name]["labels"].view(-1).to(self.cfg.device)
+                    loss = self.criterion[model_name](pred, ref)
                     loss.backward()
                     self.optimizer.step()
                     if self.scheduler is not None:
                         self.scheduler.step()
                     count += 1
-                else:
-                    
 
+                    ## residuals 
+                    ref_one_hot = F.one_hot(ref, num_classes = -1) ## self.cfg.num_labels
+                    residuals = torch.subtract(ref_one_hot, pred)
+                else:
+                    JSD = None  ## TODO: implement Jensen-Shannon divergence
+                    loss = JSD(probs, residuals)
+
+                    loss.backward()
+                    self.optimizer.step()
+                    if self.scheduler is not None:
+                        self.scheduler.step()
+
+                    residuals = torch.subtract(residuals, probs)
+                    count += 1
+            return None ## TODO: Return     
             
-            loss.backward()
-            self.optimizer.step()
-            
-            if self.scheduler is not None:
-                self.scheduler.step()
-            for key, val in logits_dict.items():
-                logits_dict[key] = val.detach().cpu()
-            self.optimizer.zero_grad()
-            return {
-                "loss" : loss.detach().cpu().item(), 
-                "logits_dict" : logits_dict, ## softmax this 
-                "label" : data[self.cfg.word_model]["labels"]
-                    }
         elif self.mode in ("dev", "test"):
-            for key, val in logits_dict.items():
-                logits_dict[key] = val.detach().cpu()
+            pred = prob.view(-1, self.cfg.num_labels)
+            ref = data[self.cfg.word_model]["labels"].view(-1).to(self.cfg.device)
+            loss = nn.CrossEntropyLoss().to(self.cfg.device)(
+                pred, 
+                ref
+                )
             return {
-                "loss" : None, 
-                "logits_dict" : logits_dict,
-                "label" : data[self.cfg.word_model]["labels"]
+                "pred" : pred, 
+                "label" : ref,
+                "loss" : loss
                 }
     
     def _eval(self, evalloader): 
@@ -802,34 +807,13 @@ class sequential_classifier(BaseEstimator):
 
         for data in tbar: 
             ret_step = self.step(data)   ## y: [bs, seq_len]
-            loss, logits_dict, y = ret_step['loss'], ret_step['logits_dict'], ret_step['label']
-            logit_word = logits_dict[self.cfg.word_model]
-            # prob = torch.nn.functional.softmax(logit_word, dim=-1) ## softmax logit_word, [bs, seq_len, num_label] 
-            pred = torch.argmax(logit_word, dim = -1) ## predicted, [bs, seq_len]
-            if self.mode == 'dev': 
-                # tbar.set_description('dev_loss - {:.4f}'.format(loss))
-                # eval_loss.append(loss)
-                ys.append(y)
-            preds.append(pred) ## use pred for F1 and change how you append 
-        # loss = np.mean(eval_loss).item() if self.mode == 'dev' else None
-        # ys = np.concatenate(ys, axis=0) if self.mode == 'dev' else None
-        # probs = np.concatenate(probs, axis=0)
+            loss, pred, labels = ret_step['loss'], ret_step['pred'], ret_step['label']
+            pred = torch.argmax(pred, dim = -1) ## predicted, [bs, seq_len]
+            ys.append(labels)
+            preds.append(pred)
         
-        if self.mode == 'dev':
-            flatten_ys, flatten_pred = np.array([]), np.array([])
-            for y_ in ys:
-                flatten_ys = np.append(flatten_ys, np.array(y_).ravel())
-            for p_ in preds:
-                flatten_pred = np.append(flatten_pred, np.array(p_).ravel())
-            
-            eval_ys, eval_pred = np.array([]), np.array([])
-            for y_, p_ in zip(flatten_ys, flatten_pred):
-                if y_ != -100:
-                    eval_ys = np.append(eval_ys, y_)
-                    eval_pred = np.append(eval_pred, p_)
-
-            results = self.evaluate_metric['f1'].compute(predictions=eval_pred, references=eval_ys, average='macro')
-            print(f"====== F1 result: {results}======")
+        results = self.evaluate_metric['f1'].compute(predictions=preds, references=ys, average='macro')
+        print(f"====== F1 result: {results}======")
 
             
         return eval_pred, eval_ys
@@ -838,8 +822,6 @@ class sequential_classifier(BaseEstimator):
 
 
 
-=======
->>>>>>> 3ed8edca8ce0f8234e6adc063f9515a106534848
         
 
 
