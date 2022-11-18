@@ -5,6 +5,34 @@ import numpy as np
 from transformers import AutoModel, AutoTokenizer, DataCollatorForTokenClassification, get_scheduler, AutoModelForMaskedLM
 import torch 
 
+from torch.nn.utils.rnn import pad_sequence #(1)
+from collections import defaultdict
+def custom_collate(data): #(2)
+    model_names = list(data[0].keys())
+    batch_size = len(data)
+    input_ids = []
+    labels = []
+    attention_mask = []
+    for m_name in model_names:
+      for i in range(batch_size):
+        input_ids.append(data[i][m_name]['input_ids'])
+    for m_name in model_names:
+      for i in range(batch_size):
+        attention_mask.append(data[i][m_name]['attention_mask'])
+    for m_name in model_names:
+      for i in range(batch_size):
+        labels.append(data[i][m_name]['labels'])
+    input_ids = pad_sequence(input_ids, batch_first=True, padding_value=1) 
+    labels = pad_sequence(labels, batch_first=True, padding_value=-100)  
+    attention_mask = pad_sequence(attention_mask, batch_first=True, padding_value=0) 
+
+    return_dict = defaultdict(defaultdict)
+    for i, m_name in enumerate(model_names):
+        return_dict[m_name]['input_ids'] = input_ids[i * batch_size : (i+1) * batch_size]
+        return_dict[m_name]['labels'] = labels[i * batch_size : (i+1) * batch_size]
+        return_dict[m_name]['attention_mask'] = attention_mask[i * batch_size : (i+1) * batch_size]
+    return return_dict
+
 
 def fetch_loaders(model_names, args):
     from datasets import load_dataset
@@ -32,15 +60,15 @@ def fetch_loaders(model_names, args):
 
     data_train = WNUTDatasetMulti(train_encoding_list, train_label_list, model_names)
     data_valid = WNUTDatasetMulti(valid_encoding_list, valid_label_list, model_names)
-    data_test = WNUTDatasetMulti(test_encoding_list, test_encoding_list, model_names)
+    data_test = WNUTDatasetMulti(test_encoding_list, test_label_list, model_names)
     loader_train = torch.utils.data.DataLoader(
-        data_train, batch_size=args.train_batch_size
+        data_train, batch_size=args.train_batch_size, collate_fn=custom_collate
     )
     loader_valid = torch.utils.data.DataLoader(
-        data_valid, batch_size=args.eval_batch_size
+        data_valid, batch_size=args.eval_batch_size, collate_fn=custom_collate
     )
     loader_test = torch.utils.data.DataLoader(
-        data_test, batch_size=args.test_batch_size
+        data_test, batch_size=args.test_batch_size, collate_fn=custom_collate
     )
     return loader_train, loader_valid, loader_test
 
@@ -72,15 +100,15 @@ def fetch_loaders2(model_names, args):
 
     data_train = WNUTDatasetMulti(train_encoding_list, train_label_list, model_names)
     data_valid = WNUTDatasetMulti(valid_encoding_list, valid_label_list, model_names)
-    data_test = WNUTDatasetMulti(test_encoding_list, test_encoding_list, model_names)
+    data_test = WNUTDatasetMulti(test_encoding_list, test_label_list, model_names)
     loader_train = torch.utils.data.DataLoader(
-        data_train, batch_size=32
+        data_train, batch_size=args.train_batch_size, collate_fn=custom_collate
     )
     loader_valid = torch.utils.data.DataLoader(
-        data_valid, batch_size=32
+        data_valid, batch_size=args.eval_batch_size, collate_fn=custom_collate
     )
     loader_test = torch.utils.data.DataLoader(
-        data_test, batch_size=32
+        data_test, batch_size=args.test_batch_size, collate_fn=custom_collate
     )
     return loader_train, loader_valid, loader_test
 
@@ -104,9 +132,9 @@ def train(args):
     # for name in model.model_dict:
     #   for p in model.model_dict[name].parameters():
     #     params.append(p)
-    optimizer = torch.optim.AdamW(model.parameters(),lr=args.lr)
-    trainloader, devloader, testloader = fetch_loaders(model_names, args) ## TODO: get data
-    # trainloader, devloader, testloader = fetch_loaders2(model_names, args)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    # trainloader, devloader, testloader = fetch_loaders(model_names, args) ## TODO: get data
+    trainloader, devloader, testloader = fetch_loaders2(model_names, args)
     num_training_steps = args.n_epochs * len(trainloader)
     scheduler = get_scheduler(
         "linear",
@@ -128,7 +156,7 @@ def train(args):
     )
 
     if args.mode == "train":
-        classifier.train(args, trainloader, devloader)
+        classifier.train(args, trainloader, testloader)
 
     if args.mode == "test":
         pass 
@@ -161,7 +189,7 @@ def train_baseline(args):
         logger = logger 
     )
     if args.mode == "train":
-        classifier.train(args, trainloader, devloader)
+        classifier.train(args, trainloader, testloader)
 
     if args.mode == "test":
         pass 
