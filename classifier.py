@@ -286,7 +286,7 @@ def train_sequential_2(args):
         device = args.device,
         logger = logger 
     )
-    classifier.JSD = JSD() ## need to have JSD 
+    classifier.prob_loss = torch.nn.MSELoss() ## need to have JSD 
 
     if args.mode == "train":
         classifier.train(args, trainloader, testloader)

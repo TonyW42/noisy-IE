@@ -859,7 +859,7 @@ class base_model(nn.Module):
         hidden_states = encoded["hidden_states"][-1]
         logits = self.lin(hidden_states)
         prob = F.log_softmax(logits, dim = -1)
-        return prob
+        return logits, prob
 
 class sequential_classifier_2(BaseEstimator):
 
@@ -873,31 +873,32 @@ class sequential_classifier_2(BaseEstimator):
             input_info = data[model_name]
             input_ids, attn_mask, token_type_ids = input_info["input_ids"], input_info["attention_mask"], input_info["labels"]
             
-            prob = model(input_ids=input_ids.to(self.cfg.device), attn_mask = attn_mask.to(self.cfg.device))
+            logits, prob = model(input_ids=input_ids.to(self.cfg.device), attn_mask = attn_mask.to(self.cfg.device))
             pred = prob.view(-1, self.cfg.num_labels)
+            logits = logits.view(-1, self.cfg.num_labels)
             ref = data[model_name]["labels"].view(-1).to(self.cfg.device)
 
             pred = pred[ref!=-100]  ## [#token, num_label]
             ref = ref[ref!=-100]    ## [#token]
 
-            if self.mode == "train":
-                if count == 0:
-                    loss = self.criterion(pred, ref)
-                    ref_one_hot = F.one_hot(ref, num_classes = self.cfg.num_labels)
-                    residuals = torch.subtract(ref_one_hot, pred).detach()
-                    prob_sum = pred
-                else:
-                    loss = self.JSD(pred, residuals) 
-                    prob_sum = torch.add(prob_sum, pred)
-                    residuals = torch.subtract(residuals, pred).detach()
+            if count == 0:
+                loss = self.criterion(pred, ref)
+                ref_one_hot = F.one_hot(ref, num_classes = self.cfg.num_labels)
+                residuals = torch.subtract(ref_one_hot, pred).detach()
+                prob_sum = pred
+            else:
+                loss = self.prob_loss(pred, residuals) 
+                prob_sum = torch.add(prob_sum, pred)
+                residuals = torch.subtract(residuals, pred).detach()
                 ## backprop
-                count += 1
-                retain_graph = not (count == num_models)
+            count += 1
+            retain_graph = not (count == num_models)
+            if self.mode == "train":
                 loss.backward(retain_graph = retain_graph)
                 self.optimizer[model_name].step()
                 if self.scheduler is not None: 
                     self.scheduler[model_name].step()
-                self.optimizer[model_name].zero_grad() ## delete this 
+                # self.optimizer[model_name].zero_grad() ## delete this 
         
         # print(ref)
         # print(F.log_softmax(prob_sum))
@@ -923,8 +924,8 @@ class sequential_classifier_2(BaseEstimator):
         for data in tbar: 
             ret_step = self.step(data)   ## y: [bs, seq_len]
             loss, pred, labels = ret_step['loss'], ret_step['pred'], ret_step['label']
-            ys.append(labels)
-            preds.append(pred)
+            ys.extend(labels.tolist())
+            preds.extend(pred.tolist())
         
         results = self.evaluate_metric['f1'].compute(predictions=preds, references=ys, average='macro')
         print(f"====== F1 result: {results}======")
