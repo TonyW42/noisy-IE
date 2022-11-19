@@ -78,7 +78,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     args.granularities = args.granularities.split(",")
     args.train = True if args.mode == "True" else False
-    args.model_names = [args.granularities_model[key] for key in args.granularities_model]
+    # args.model_names = [args.granularities_model[key] for key in args.granularities_model]
+    args.model_names = args.model_list.split('|')
     
     if not args.device:
         if torch.cuda.is_available():
