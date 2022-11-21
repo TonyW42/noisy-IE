@@ -558,7 +558,7 @@ class baseline_classifier(BaseEstimator):
             # loss = torch.tensor(0.00, requires_grad = True)
             loss.backward()
             self.optimizer.step()
-            print("=========  step weight ===========")
+            # print("=========  step weight ===========")
             # print(list(self.model.parameters())[0].grad)
             # print(self.model.attention_layers[0].self_attention.query_lin.weight)
             # print(self.model.attention_layers[2].in_proj_weight[0][:10])
