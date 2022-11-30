@@ -98,17 +98,18 @@ class wnut_multiple_granularity(Dataset):
         # Should end up something like 
         # self.data = {model_name : DatasetDict }, where 
         # datadict is created using previous tokenization method in data.py 
-        for granularity in self.args.granularities:
-            name = self.args.granularities_model[granularity]
+        for name in self.args.model_names:
+            # name = self.args.granularities_model[granularity]
             print(f"============== tokenizing {name} ==============")
-            if granularity == "character":
+            # if granularity == "character":
+            if "canine" in name:
                 clm = CharacterLevelMapping(self.args.to_char_method)
                 wnut_character_level = clm.character_level_wnut(self.wnut)
-                tok = Tokenization(self.args.granularities_model[granularity], self.args.prefix_space)
+                tok = Tokenization(name, self.args.prefix_space)
                 tokenized_wnut = tok.tokenize_for_char_manual(wnut_character_level)
                 self.data_[name] = tokenized_wnut
                 self.data_length[name] = tokenized_wnut['train'].num_rows
-            elif granularity == "subword_50k" or granularity == "subword_30k" or granularity == "subword_250k":
+            elif granularity == "subword_50k" or granularity == "subword_30k":
                 tok = Tokenization(self.args.granularities_model[granularity], self.args.prefix_space)
                 tokenized_wnut = self.wnut.map(tok.tokenize_and_align_labels, batched=True) ## was previously wnut_character level 
                 self.data_[name] = tokenized_wnut
@@ -556,7 +557,7 @@ class baseline_classifier(BaseEstimator):
             # loss = torch.tensor(0.00, requires_grad = True)
             loss.backward()
             self.optimizer.step()
-            print("=========  step weight ===========")
+            # print("=========  step weight ===========")
             # print(list(self.model.parameters())[0].grad)
             # print(self.model.attention_layers[0].self_attention.query_lin.weight)
             # print(self.model.attention_layers[2].in_proj_weight[0][:10])
