@@ -72,6 +72,36 @@ def fetch_loaders(model_names, args):
     )
     return loader_train, loader_valid, loader_test
 
+def fetch_loaders_SST(model_names, args):
+    from datasets import load_dataset
+    sst = load_dataset("sst")
+    train_encoding_list = []
+    valid_encoding_list = []
+    test_encoding_list = []
+    for model_name in model_names:
+        tokenizer = AutoTokenizer.from_pretrained(model_name, add_prefix_space=True) ## changed here
+        xlm_train_encoding = tokenizer(sst['train']["sentense"], padding="longest",truncation=True, is_split_into_words=True)
+        xlm_valid_encoding = tokenizer(sst['validation']["sentense"], padding="longest", truncation=True, is_split_into_words=True)
+        xlm_test_encoding = tokenizer(sst['test']["sentense"], padding="longest", truncation=True, is_split_into_words=True)
+
+        train_encoding_list.append(xlm_train_encoding)
+        valid_encoding_list.append(xlm_valid_encoding)
+        test_encoding_list.append(xlm_test_encoding)
+
+    data_train = SSTDatasetMulti(train_encoding_list, model_names)
+    data_valid = SSTDatasetMulti(valid_encoding_list, model_names)
+    data_test = SSTDatasetMulti(test_encoding_list, model_names)
+    
+    loader_train = torch.utils.data.DataLoader(
+        data_train, batch_size=args.train_batch_size, collate_fn=custom_collate
+    )
+    loader_valid = torch.utils.data.DataLoader(
+        data_valid, batch_size=args.eval_batch_size, collate_fn=custom_collate
+    )
+    loader_test = torch.utils.data.DataLoader(
+        data_test, batch_size=args.test_batch_size, collate_fn=custom_collate
+    )
+    return loader_train, loader_valid, loader_test
 
 def fetch_loaders2(model_names, args):
     from datasets import load_dataset
@@ -165,6 +195,80 @@ def train(args):
     ## do something to evaluate the model  
     ## Note: could evaluate using seqeval in the estimator's _eval() function 
     ## need to re-write the _eval() function for token classification. 
+
+def train_MLM(args):
+    ## initialize model
+    model_names = args.model_list.split("|")
+    model_dict = torch.nn.ModuleDict()
+    for model_name in model_names:
+        model_dict[model_name] = AutoModel.from_pretrained(model_name, num_labels=args.num_labels)
+    base = MTL_base(model_dict = model_dict, args = args).to(args.device)
+    MLM_model = flat_MLM_w_base(base = base, args = args).to(args.device)
+
+    criterion = torch.nn.ModuleDict()
+    for model_name in model_names:
+        criterion[model_name] = torch.nn.CrossEntropyLoss().to(args.device)
+    # criterion = torch.nn.CrossEntropyLoss().to(args.device) ## weight the loss if you wish
+    print(" ====== parameters? ========")
+    for name, p in model.named_parameters():
+        print(name)
+    # params = [p for p in model.parameters()]
+    # for name in model.model_dict:
+    #   for p in model.model_dict[name].parameters():
+    #     params.append(p)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    # trainloader, devloader, testloader = fetch_loaders(model_names, args) ## TODO: get data
+    ## TODO: fix fetch_loaders_SST function
+    trainloader, devloader, testloader = fetch_loaders_SST(model_names, args)
+    num_training_steps = args.n_epochs * len(trainloader)
+    scheduler = get_scheduler(
+        "linear",
+        optimizer=optimizer,
+        num_warmup_steps=0,
+        num_training_steps=num_training_steps
+    )
+    logger = None ## TODO: add logger to track progress
+
+
+    MLM_classifier = MTL_classifier(
+        model = model, 
+        cfg = args,
+        criterion = criterion, 
+        optimizer = optimizer, 
+        scheduler = scheduler, 
+        device = args.device,
+        logger = logger 
+    )
+    MLM_classifier.train(args, trainloader, testloader)  ## train MLM
+
+    #####################################################################
+    model = flat_MTL_w_base(base = base, args = args).to(args.device)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    # trainloader, devloader, testloader = fetch_loaders(model_names, args) ## TODO: get data
+    trainloader, devloader, testloader = fetch_loaders2(model_names, args)
+    num_training_steps = args.n_epochs * len(trainloader)
+    scheduler = get_scheduler(
+        "linear",
+        optimizer=optimizer,
+        num_warmup_steps=0,
+        num_training_steps=num_training_steps
+    )
+    logger = None ## TODO: add logger to track progress
+    classifier = MTL_classifier(
+        model = model, 
+        cfg = args,
+        criterion = criterion, 
+        optimizer = optimizer, 
+        scheduler = scheduler, 
+        device = args.device,
+        logger = logger 
+    )
+    if args.mode == "train":
+        classifier.train(args, trainloader, testloader)
+
+
+        # use functions from evaluate_utils to test model.
+
 
 def train_baseline(args):
     model = baseline_model(args = args).to(args.device)

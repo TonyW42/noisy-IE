@@ -67,6 +67,24 @@ class WNUTDatasetMulti(torch.utils.data.Dataset):
     def __len__(self):
         return len(self.labels[0])
 
+## SST data for 
+class SSTDatasetMulti(torch.utils.data.Dataset):
+    def __init__(self, encodings, model_names):
+        # inputs are as Lists of encodings, labels, and models names : []
+        self.encodings = encodings
+        self.model_names = model_names
+
+    def __getitem__(self, idx):
+        result = {}
+        for encoding, model_name in zip(self.encodings, self.model_names):
+            item = {key: torch.tensor(val[idx]) for key, val in encoding.items()}
+            item['labels'] = item["input_ids"]
+            result[model_name] = item
+        return result
+
+    def __len__(self):
+        return len(self.encodings[self.model_names[0]]) ## TODO HERE!
+
 
 ## need dataset/loader structure such as the following:
 ## integrate to data.py if possible 
@@ -205,7 +223,7 @@ class attention_MTL(nn.Module):
                 ## write the attention ourselves? 
                 hidden_states_sum = torch.add(hidden_states_sum, attn_output * self.weight_dict[model_name_q][count])
                 count += 1
-            logit = nn.functional.softmax(self.lin_layer_dict[model_name](hidden_states_sum), dim=-1)
+            logit = self.lin_layer_dict[model_name](hidden_states_sum)
             self.logits_dict[model_name] = logit
     
         return self.logits_dict ## {model_name: logit}
@@ -448,7 +466,7 @@ class flat_MTL(nn.Module):
             seq_len_model = input_info["input_ids"].shape[1]
             count_next = count + seq_len_model
             self.hidden_states_dict[model_name] = attn_output[:, count:count_next, :]
-            self.logits_dict[model_name] = nn.functional.softmax(self.lin_layer_dict[model_name](self.hidden_states_dict[model_name]), dim=-1)
+            self.logits_dict[model_name] = self.lin_layer_dict[model_name](self.hidden_states_dict[model_name])
             count += seq_len_model
         #####################################################################
     
@@ -523,6 +541,104 @@ class flat_MTL_for_MLM(nn.Module):
     
         return self.logits_dict ## {model_name: logit}
 
+class MTL_base(nn.Module):
+    def __init__(self, model_dict, args):
+        super().__init__()  ## delete this ??
+        self.model_dict = model_dict
+        self.args = args
+        self.lin_layer_dict = nn.ModuleDict()
+        self.num_align_layers = args.num_att_layers
+        if self.args.layer_type == 'att':
+            self.align_layers = nn.ModuleList(
+                [nn.MultiheadAttention(
+                    embed_dim = self.args.embed_size_dict[self.args.word_model],
+                    num_heads = 1,
+                    batch_first=True) 
+                for _ in range(self.num_align_layers)]
+            )
+        if self.args.layer_type == "bert":
+            self.align_layers = nn.ModuleList(
+            [BertLayer(emb_size = self.args.embed_size_dict[self.args.word_model]) for _ in range(self.num_align_layers)]
+            )
+        
+    def forward(self, input_info_dict):
+        hidden_states_all = [] ## [num_model, bs, seq_len, embed_size]
+        self.hidden_states_dict = dict()
+        for model_name in self.model_dict:
+            ## get information
+            model = self.model_dict[model_name]
+            input_info = input_info_dict[model_name]
+            input_ids, attn_mask, token_type_ids = input_info["input_ids"], input_info["attention_mask"], input_info["labels"]
+            ## get contexualized representation
+            # print(input_ids.shape)
+            encoded = model(return_dict = True, output_hidden_states=True, input_ids=input_ids.to(self.args.device), attention_mask = attn_mask.to(self.args.device))
+            hidden_states = encoded["hidden_states"][-1]  ## [bs, seq_len, embed_size]
+            ## TODO: add positional embbeding 
+            hidden_states_all.append(hidden_states)
+        hidden_all = torch.cat(hidden_states_all, dim = 1)
+
+        for i in range(self.num_align_layers):
+            if self.args.layer_type == 'bert':
+                hidden_all = self.align_layers[i](hidden_all)
+            if self.args.layer_type == 'att':
+                hidden_all, _ = self.align_layers[0](
+                    query = hidden_all, 
+                    key = hidden_all, 
+                    value = hidden_all
+                )
+
+        ## separate hidden states from the global attention output
+        ##################################################################
+        ######## SOURCE OF A bug 
+        count = 0
+        for model_name in self.model_dict: 
+            input_info = input_info_dict[model_name]
+            seq_len_model = input_info["input_ids"].shape[1]
+            count_next = count + seq_len_model
+            self.hidden_states_dict[model_name] = hidden_all[:, count:count_next, :]
+            count += seq_len_model
+        #####################################################################
+    
+        return self.hidden_states_dict ## {model_name: logit}
+
+class flat_MTL_w_base(nn.Module):
+    def __init__(self, base, args):
+        super().__init__()
+        self.args = args
+        self.base = base
+        for model_name in base.model_dict:
+            # add one linear layer per model
+            lin_layer = nn.Linear(self.args.embed_size_dict[model_name], args.num_labels)
+            self.lin_layer_dict[model_name] = lin_layer
+    
+    def forward(self, input_info_dict):
+        self.logits_dict = dict()
+        hidden_states_dict = self.base(input_info_dict)
+        for model_name in self.lin_layer_dict:
+            self.logits_dict[model_name] = self.lin_layer_dict[model_name](self.hidden_states_dict[model_name])
+        return self.logits_dict
+
+class flat_MLM_w_base(nn.Module):
+    def __init__(self, base, args):
+        super().__init__()
+        self.args = args
+        self.base = base
+        for model_name in base.model_dict:
+            # add one linear layer per model
+            lin_layer = nn.Linear(self.args.embed_size_dict[model_name], base.model_dict[model_name].config.vocab_size)
+            self.lin_layer_dict[model_name] = lin_layer
+    
+    def forward(self, input_info_dict):
+        self.logits_dict = dict()
+        hidden_states_dict = self.base(input_info_dict)
+        for model_name in self.lin_layer_dict:
+            self.logits_dict[model_name] = self.lin_layer_dict[model_name](self.hidden_states_dict[model_name])
+        return self.logits_dict
+
+
+
+            
+            
 
 
 

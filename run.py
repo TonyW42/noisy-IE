@@ -58,7 +58,7 @@ if __name__ == '__main__':
     parser.add_argument('--expr', type = str, default = "MTL") ## change back to MTL
     parser.add_argument('--save', type = str, default = "true")
     parser.add_argument('--layer_type', type=str, default='att')
-    
+
     parser.add_argument('--granularities_model', type=dict, 
                         default= {"character": "google/canine-s",
                                 "subword_50k": "roberta-base",
@@ -96,6 +96,8 @@ if __name__ == '__main__':
         train_baseline(args)
     elif args.expr == "sequential":
         train_sequential_2(args)
+    elif args.expr == "mlm":
+        train_MLM(args)
     else:
         train(args)
 
