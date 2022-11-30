@@ -709,6 +709,7 @@ class BertLayer(nn.Module):
         forward_linear = self.interm_dense(attention_normed)
         forward_act = self.interm_af(forward_linear)
         ## output 
+        out = self.out_dense(forward_act)
         out = self.add_norm(attention_normed, forward_act, self.out_dense,
                             self.out_dropout, self.out_layer_norm)
         return out 
