@@ -108,7 +108,7 @@ class wnut_multiple_granularity(Dataset):
                 tokenized_wnut = tok.tokenize_for_char_manual(wnut_character_level)
                 self.data_[name] = tokenized_wnut
                 self.data_length[name] = tokenized_wnut['train'].num_rows
-            elif granularity == "subword_50k" or granularity == "subword_30k":
+            elif granularity == "subword_50k" or granularity == "subword_30k" or granularity == "subword_250k":
                 tok = Tokenization(self.args.granularities_model[granularity], self.args.prefix_space)
                 tokenized_wnut = self.wnut.map(tok.tokenize_and_align_labels, batched=True) ## was previously wnut_character level 
                 self.data_[name] = tokenized_wnut
@@ -879,17 +879,18 @@ class sequential_classifier_2(BaseEstimator):
             ref = data[model_name]["labels"].view(-1).to(self.cfg.device)
 
             pred = pred[ref!=-100]  ## [#token, num_label]
+            logits = logits[ref!=-100]
             ref = ref[ref!=-100]    ## [#token]
 
             if count == 0:
-                loss = self.criterion(pred, ref)
+                loss = self.criterion(logits, ref)
                 ref_one_hot = F.one_hot(ref, num_classes = self.cfg.num_labels)
-                residuals = torch.subtract(ref_one_hot, pred).detach()
-                prob_sum = pred
+                residuals = torch.subtract(ref_one_hot, F.softmax(logits, dim = -1)).detach()
+                prob_sum = F.softmax(logits, dim = -1)
             else:
-                loss = self.prob_loss(pred, residuals) 
-                prob_sum = torch.add(prob_sum, pred)
-                residuals = torch.subtract(residuals, pred).detach()
+                loss = self.prob_loss(logits, residuals) 
+                prob_sum = torch.add(prob_sum, logits)
+                residuals = torch.subtract(residuals, logits).detach()
                 ## backprop
             count += 1
             retain_graph = not (count == num_models)
@@ -902,12 +903,12 @@ class sequential_classifier_2(BaseEstimator):
         
         # print(ref)
         # print(F.log_softmax(prob_sum))
-        loss = self.criterion(F.log_softmax(prob_sum, dim = -1), ref)
+        loss = nn.NLLLoss()(F.log_softmax(prob_sum, dim = -1), ref)
         return {
-            "loss" : loss,
-            "pred" : torch.argmax(prob_sum, dim = -1), ## [#tokens]
-            "prob" : prob_sum, ## [#tokens, num_class]
-            "label" : ref   ## [#tokens]
+            "loss" : loss.detach().cpu().item(),
+            "pred" : torch.argmax(prob_sum, dim = -1).detach().cpu(), ## [#tokens]
+            "prob" : prob_sum.detach().cpu(), ## [#tokens, num_class]
+            "label" : ref.detach().cpu()  ## [#tokens]
         }
 
     def _eval(self, evalloader): 
