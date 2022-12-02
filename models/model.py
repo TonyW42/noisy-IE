@@ -13,6 +13,7 @@ from datasets import DatasetDict, Dataset
 import typing
 from transformers import AutoModel
 import torch.nn.functional as F
+from datasets import load_metric
 
 id2tag = {0: 'O',
           1: 'B-corporation',
@@ -127,8 +128,10 @@ class wnut_multiple_granularity(Dataset):
                 tokenized_wnut = tok.tokenize_for_char_manual(wnut_character_level)
                 self.data_[name] = tokenized_wnut
                 self.data_length[name] = tokenized_wnut['train'].num_rows
-            elif granularity == "subword_50k" or granularity == "subword_30k":
-                tok = Tokenization(self.args.granularities_model[granularity], self.args.prefix_space)
+            # elif granularity == "subword_50k" or granularity == "subword_30k":
+            else:
+                # tok = Tokenization(self.args.granularities_model[granularity], self.args.prefix_space)
+                tok = Tokenization(name, self.args.prefix_space)
                 tokenized_wnut = self.wnut.map(tok.tokenize_and_align_labels, batched=True) ## was previously wnut_character level 
                 self.data_[name] = tokenized_wnut
                 self.data_length[name] = tokenized_wnut['train'].num_rows
@@ -302,6 +305,7 @@ class MTL_classifier(BaseEstimator):
         if self.evaluate_metric is None:
             self.evaluate_metric = dict()
             self.evaluate_metric['f1'] = evaluate.load("f1")
+            self.evaluate_metric['all'] = load_metric("seqeval")
 
         for data in tbar: 
             ret_step = self.step(data)   ## y: [bs, seq_len]
@@ -713,6 +717,7 @@ class baseline_classifier(BaseEstimator):
         if self.evaluate_metric is None:
             self.evaluate_metric = dict()
             self.evaluate_metric['f1'] = evaluate.load("f1")
+            self.evaluate_metric['all'] = load_metric("seqeval")
 
         for data in tbar: 
             ret_step = self.step(data)   ## y: [bs, seq_len]
@@ -938,6 +943,7 @@ class sequential_classifier(BaseEstimator):
         if self.evaluate_metric is None:
             self.evaluate_metric = dict()
             self.evaluate_metric['f1'] = evaluate.load("f1")
+            self.evaluate_metric['all'] = load_metric("seqeval")
 
         for data in tbar: 
             ret_step = self.step(data)   ## y: [bs, seq_len]
@@ -1039,6 +1045,7 @@ class sequential_classifier_2(BaseEstimator):
         if self.evaluate_metric is None:
             self.evaluate_metric = dict()
             self.evaluate_metric['f1'] = evaluate.load("f1")
+            self.evaluate_metric['all'] = load_metric("seqeval")
 
         for data in tbar: 
             ret_step = self.step(data)   ## y: [bs, seq_len]

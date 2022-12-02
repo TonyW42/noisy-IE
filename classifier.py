@@ -7,7 +7,7 @@ import torch
 
 from torch.nn.utils.rnn import pad_sequence #(1)
 from collections import defaultdict
-def custom_collate(data): #(2)
+def custom_collate(data, seq_len=512): #(2)
     model_names = list(data[0].keys())
     batch_size = len(data)
     input_ids = []
@@ -15,13 +15,13 @@ def custom_collate(data): #(2)
     attention_mask = []
     for m_name in model_names:
       for i in range(batch_size):
-        input_ids.append(data[i][m_name]['input_ids'])
+        input_ids.append(data[i][m_name]['input_ids'][:seq_len])
     for m_name in model_names:
       for i in range(batch_size):
-        attention_mask.append(data[i][m_name]['attention_mask'])
+        attention_mask.append(data[i][m_name]['attention_mask'][:seq_len])
     for m_name in model_names:
       for i in range(batch_size):
-        labels.append(data[i][m_name]['labels'])
+        labels.append(data[i][m_name]['labels'][:seq_len])
     input_ids = pad_sequence(input_ids, batch_first=True, padding_value=1) 
     labels = pad_sequence(labels, batch_first=True, padding_value=-100)  
     attention_mask = pad_sequence(attention_mask, batch_first=True, padding_value=0) 
@@ -165,6 +165,7 @@ def train(args):
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     # trainloader, devloader, testloader = fetch_loaders(model_names, args) ## TODO: get data
     trainloader, devloader, testloader = fetch_loaders2(model_names, args)
+    print("new fetch loaders")
     num_training_steps = args.n_epochs * len(trainloader)
     scheduler = get_scheduler(
         "linear",
