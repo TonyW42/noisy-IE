@@ -339,11 +339,11 @@ class MTL_classifier(BaseEstimator):
             print(f"====== F1 result: {results}======")
 
             true_predictions = [
-                [p for (p, l) in zip(np.array(p_).ravel(), np.array(y_).ravel()) if l != -100]
+                [id2tag[p] for (p, l) in zip(np.array(p_).ravel(), np.array(y_).ravel()) if l != -100]
                 for p_, y_ in zip(preds, ys)
             ]
             true_labels = [
-                [l for (p, l) in zip(np.array(p_).ravel(), np.array(y_).ravel()) if l != -100]
+                [id2tag[l] for (p, l) in zip(np.array(p_).ravel(), np.array(y_).ravel()) if l != -100]
                 for p_, y_ in zip(preds, ys)
             ]
 
