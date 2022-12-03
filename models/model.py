@@ -339,16 +339,17 @@ class MTL_classifier(BaseEstimator):
             print(f"====== F1 result: {results}======")
 
             true_predictions = [
-                [p for (p, l) in zip(np.array(p_).ravel(), np.array(y_).ravel()) if l != -100]
+                [id2tag[p] for (p, l) in zip(np.array(p_).ravel(), np.array(y_).ravel()) if l != -100]
                 for p_, y_ in zip(preds, ys)
             ]
             true_labels = [
-                [l for (p, l) in zip(np.array(p_).ravel(), np.array(y_).ravel()) if l != -100]
+                [id2tag[l] for (p, l) in zip(np.array(p_).ravel(), np.array(y_).ravel()) if l != -100]
                 for p_, y_ in zip(preds, ys)
             ]
 
             result_ = self.evaluate_metric['all'].compute(predictions=true_predictions, references=true_labels, )
-            print(f"{result_}")
+            # print(f"{result_}")
+            print(f"===== *F1 result: {result_['overall_f1']}======")
 
 
             # if self.writer is not None: 
