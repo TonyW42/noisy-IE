@@ -161,6 +161,36 @@ class wnut_multiple_granularity(Dataset):
         return return_dict_train
 
 
+def eval_f1(ys, preds, eval_m):
+    flatten_ys, flatten_pred = np.array([]), np.array([])
+    for y_ in ys:
+        flatten_ys = np.append(flatten_ys, np.array(y_).ravel())
+    for p_ in preds:
+        flatten_pred = np.append(flatten_pred, np.array(p_).ravel())
+    
+    eval_ys, eval_pred = np.array([]), np.array([])
+    for y_, p_ in zip(flatten_ys, flatten_pred):
+        if y_ != -100:
+            eval_ys = np.append(eval_ys, y_)
+            eval_pred = np.append(eval_pred, p_)
+
+    results = eval_m['f1'].compute(predictions=eval_pred, references=eval_ys, average='macro')
+    print(f"====== F1 result: {results}======")
+
+    true_predictions = [
+        [id2tag[p] for (p, l) in zip(np.array(p_).ravel(), np.array(y_).ravel()) if l != -100]
+        for p_, y_ in zip(preds, ys)
+    ]
+    true_labels = [
+        [id2tag[l] for (p, l) in zip(np.array(p_).ravel(), np.array(y_).ravel()) if l != -100]
+        for p_, y_ in zip(preds, ys)
+    ]
+
+    result_ = eval_m['all'].compute(predictions=true_predictions, references=true_labels, )
+    print(f"===== *F1 result: {result_['overall_f1']}======")
+
+    return eval_pred, eval_ys
+
 
 ## multitask learning 
 class attention_MTL(nn.Module):
@@ -269,8 +299,7 @@ class MLM_classifier(BaseEstimator):
                 "label" : data[self.cfg.word_model]["input_ids"]
                 }
     def _eval(self, evalloader): 
-      print('we do not eval')
-        
+        print('we do not eval')
         
 
 class MTL_classifier(BaseEstimator):
@@ -289,33 +318,12 @@ class MTL_classifier(BaseEstimator):
                 else: 
                     loss += self.criterion[model_name](logit.view(-1, self.cfg.num_labels), data[model_name]["labels"].view(-1).to(self.cfg.device))
                 count += 1
-                # if model_name == 'xlm-roberta-base':
-                #     loss_tmp1 = self.criterion[model_name](logit.view(-1, self.cfg.num_labels), data[model_name]["labels"].view(-1))
-                # else: 
-                #     loss_tmp2 = self.criterion[model_name](logit.view(-1, self.cfg.num_labels), data[model_name]["labels"].view(-1))
-                # loss = torch.cat((loss, torch.unsqueeze(self.criterion[model_name](logit.view(-1, self.cfg.num_labels), data[model_name]["labels"].view(-1)), 0)))
                 ## todo: penalize disagreement by adding other loss 
                 ## todo: penalize weighted loss instead of simple sum? 
             # loss = torch.sum(loss)
             # loss = loss_tmp1 + loss_tmp2
             loss.backward()
             self.optimizer.step()
-            # print("=========  step weight ===========")
-            # print(list(self.model.parameters())[0].grad)
-            # print(self.model.bert_layers[0].self_attention.query_lin.weight)
-            # print(self.model.attention_layers[1].in_proj_weight[0][:10])
-            # print(self.model.attention_layers[2].in_proj_weight[0][:10])
-            # print(self.model.attention_layers[3].in_proj_weight[0][:10])
-            # print(self.model.attention_layers[4].in_proj_weight[0][:10])
-            # print(self.model.attention_layers[5].in_proj_weight[0][:10])
-            # print("==================================")
-
-            # print(self.model.attention_layers[0].out_proj.weight[0][:10])
-            # print(self.model.attention_layers[1].out_proj.weight[0][:10])
-            # print(self.model.attention_layers[2].out_proj.weight[0][:10])
-            # print(self.model.attention_layers[3].out_proj.weight[0][:10])
-            # print(self.model.attention_layers[4].out_proj.weight[0][:10])
-            # print(self.model.attention_layers[5].out_proj.weight[0][:10])
             if self.scheduler is not None:
                 self.scheduler.step()
             for key, val in logits_dict.items():
@@ -358,55 +366,9 @@ class MTL_classifier(BaseEstimator):
                 # eval_loss.append(loss)
                 ys.append(y)
             preds.append(pred) ## use pred for F1 and change how you append 
-        # loss = np.mean(eval_loss).item() if self.mode == 'dev' else None
-        # ys = np.concatenate(ys, axis=0) if self.mode == 'dev' else None
-        # probs = np.concatenate(probs, axis=0)
         
         if self.mode == 'dev':
-            flatten_ys, flatten_pred = np.array([]), np.array([])
-            for y_ in ys:
-                flatten_ys = np.append(flatten_ys, np.array(y_).ravel())
-            for p_ in preds:
-                flatten_pred = np.append(flatten_pred, np.array(p_).ravel())
-            
-            eval_ys, eval_pred = np.array([]), np.array([])
-            for y_, p_ in zip(flatten_ys, flatten_pred):
-                if y_ != -100:
-                    eval_ys = np.append(eval_ys, y_)
-                    eval_pred = np.append(eval_pred, p_)
-
-            results = self.evaluate_metric['f1'].compute(predictions=eval_pred, references=eval_ys, average='macro')
-            print(f"====== F1 result: {results}======")
-
-            true_predictions = [
-                [id2tag[p] for (p, l) in zip(np.array(p_).ravel(), np.array(y_).ravel()) if l != -100]
-                for p_, y_ in zip(preds, ys)
-            ]
-            true_labels = [
-                [id2tag[l] for (p, l) in zip(np.array(p_).ravel(), np.array(y_).ravel()) if l != -100]
-                for p_, y_ in zip(preds, ys)
-            ]
-
-            result_ = self.evaluate_metric['all'].compute(predictions=true_predictions, references=true_labels, )
-            # print(f"{result_}")
-            print(f"===== *F1 result: {result_['overall_f1']}======")
-
-
-            # if self.writer is not None: 
-            #     self.writer.add_scalar('dev/loss', loss, self.dev_step)
-            #     self.writer.add_scalar('dev/macro/auc', macro_auc, self.dev_step)
-            #     self.writer.add_scalar('dev/micro/auc', micro_auc, self.dev_step)
-            #     if self.pred_thold is not None: 
-            #         yhats = (probs > self.pred_thold).astype(int)
-            #         macros = precision_recall_fscore_support(ys, yhats, average='macro')
-            #         self.writer.add_scalar('dev/macro/precision', macros[0], self.dev_step)
-            #         self.writer.add_scalar('dev/macro/recall', macros[1], self.dev_step)
-            #         self.writer.add_scalar('dev/macro/f1', macros[2], self.dev_step)
-            #         micros = precision_recall_fscore_support(ys, yhats, average='micro')
-            #         self.writer.add_scalar('dev/micro/precision', micros[0], self.dev_step)
-            #         self.writer.add_scalar('dev/micro/recall', micros[1], self.dev_step)
-            #         self.writer.add_scalar('dev/micro/f1', micros[2], self.dev_step)
-        return eval_pred, eval_ys
+            return eval_f1(ys, preds, self.evaluate_metric)
 
 
 class weighted_ensemble(BaseClassifier):
@@ -776,35 +738,7 @@ class baseline_classifier(BaseEstimator):
         # probs = np.concatenate(probs, axis=0)
         
         if self.mode == 'dev':
-            flatten_ys, flatten_pred = np.array([]), np.array([])
-            for y_ in ys:
-                flatten_ys = np.append(flatten_ys, np.array(y_).ravel())
-            for p_ in preds:
-                flatten_pred = np.append(flatten_pred, np.array(p_).ravel())
-            
-            eval_ys, eval_pred = np.array([]), np.array([])
-            for y_, p_ in zip(flatten_ys, flatten_pred):
-                if y_ != -100:
-                    eval_ys = np.append(eval_ys, y_)
-                    eval_pred = np.append(eval_pred, p_)
-
-            results = self.evaluate_metric['f1'].compute(predictions=eval_pred, references=eval_ys, average='macro')
-            print(f"====== F1 result: {results}======")
-
-            true_predictions = [
-                [id2tag[p] for (p, l) in zip(np.array(p_).ravel(), np.array(y_).ravel()) if l != -100]
-                for p_, y_ in zip(preds, ys)
-            ]
-            true_labels = [
-                [id2tag[l] for (p, l) in zip(np.array(p_).ravel(), np.array(y_).ravel()) if l != -100]
-                for p_, y_ in zip(preds, ys)
-            ]
-
-            result_ = self.evaluate_metric['all'].compute(predictions=true_predictions, references=true_labels, )
-            # print(f"{result_}")
-            print(f"===== *F1 result: {result_['overall_f1']}======")
-
-        return eval_pred, eval_ys
+            return eval_f1(ys, preds, self.evaluate_metric)
 
 class self_attention(nn.Module):
     def __init__(self, emb_size, dropout_p = 0.1, eps = 1e-12):
