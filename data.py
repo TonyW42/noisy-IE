@@ -287,12 +287,6 @@ if __name__ == '__main__':
   a = tok.tokenize_wnut_char()
   print(a["train"][0]["input_ids"])
   print(a["train"][0]["labels"])
-  # print(a["train"][0])
-  # print(len(a["train"][0]["input_ids"]))
-  # print(len(a["train"][0]["attention_mask"]))
-  # print(len(a["train"][0]["labels"]))
-  # assert len(a["train"][0]["input_ids"]) == len(a["train"][0]["attention_mask"])
-  # assert len(a["train"][0]["input_ids"]) == len(a["train"][0]["labels"])
 
 
 

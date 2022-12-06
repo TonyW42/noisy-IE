@@ -244,9 +244,9 @@ class MLM_classifier(BaseEstimator):
             for model_name, logit in logits_dict.items():
                 vocab_size = 1114112 if model_name == 'google/canine-s' else self.model.base.model_dict[model_name].config.vocab_size
                 if count == 0: 
-                    loss = self.criterion[model_name](logit.view(-1, vocab_size), data[model_name]["input_ids"].view(-1).to(self.cfg.device))
+                    loss = self.criterion[model_name](logit.view(-1, vocab_size), data[model_name]["labels"].view(-1).to(self.cfg.device))
                 else: 
-                    loss += self.criterion[model_name](logit.view(-1, vocab_size), data[model_name]["input_ids"].view(-1).to(self.cfg.device))
+                    loss += self.criterion[model_name](logit.view(-1, vocab_size), data[model_name]["labels"].view(-1).to(self.cfg.device))
                 count += 1
             loss.backward()
             self.optimizer.step()
@@ -626,7 +626,7 @@ class MTL_base(nn.Module):
             ## get information
             model = self.model_dict[model_name]
             input_info = input_info_dict[model_name]
-            input_ids, attn_mask = input_info["input_ids"], input_info["attention_mask"]
+            input_ids, attn_mask, token_ids = input_info["input_ids"], input_info["attention_mask"], input_info["labels"]
             ## get contexualized representation
             # print(input_ids.shape)
             encoded = model(return_dict = True, output_hidden_states=True, input_ids=input_ids.to(self.args.device), attention_mask = attn_mask.to(self.args.device))
