@@ -34,7 +34,7 @@ def custom_collate(data, seq_len=512): #(2)
     return return_dict
 
 
-def custom_collate_SST(data, seq_len=512): #(2)
+def custom_collate_SST(data, seq_len=512, probability=0.15): #(2)
     model_names = list(data[0].keys())
     batch_size = len(data)
     input_ids = []
@@ -52,7 +52,7 @@ def custom_collate_SST(data, seq_len=512): #(2)
 
     rand = torch.rand(input_ids.shape)
     # where the random array is less than 0.15, we set true
-    mask_arr = rand < 0.15
+    mask_arr = rand < probability
     mask_arr = mask_arr * (input_ids != -100)
 
     selection = []
