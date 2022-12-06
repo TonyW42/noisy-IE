@@ -46,18 +46,31 @@ def custom_collate_SST(data, seq_len=512): #(2)
     for m_name in model_names:
       for i in range(batch_size):
         attention_mask.append(data[i][m_name]['attention_mask'][:seq_len])
-    # for m_name in model_names:
-    #   for i in range(batch_size):
-    #     labels.append(data[i][m_name]['token_type_ids'][:seq_len])
     input_ids = pad_sequence(input_ids, batch_first=True, padding_value=1) 
-    # labels = pad_sequence(labels, batch_first=True, padding_value=-100)  
+    labels = input_ids.clone()
     attention_mask = pad_sequence(attention_mask, batch_first=True, padding_value=0) 
+
+    rand = torch.rand(input_ids.shape)
+    # where the random array is less than 0.15, we set true
+    mask_arr = rand < 0.15
+    mask_arr = mask_arr * (input_ids != -100)
+
+    selection = []
+
+    for i in range(input_ids.shape[0]):
+        selection.append(
+            torch.flatten(mask_arr[i].nonzero()).tolist()
+        )
+
+    for i in range(input_ids.shape[0]):
+        labels[i, selection[i]] = -100
 
     return_dict = defaultdict(defaultdict)
     for i, m_name in enumerate(model_names):
         return_dict[m_name]['input_ids'] = input_ids[i * batch_size : (i+1) * batch_size]
-        # return_dict[m_name]['token_type_ids'] = labels[i * batch_size : (i+1) * batch_size]
+        return_dict[m_name]['labels'] = labels[i * batch_size : (i+1) * batch_size]
         return_dict[m_name]['attention_mask'] = attention_mask[i * batch_size : (i+1) * batch_size]
+    
     return return_dict
 
 
