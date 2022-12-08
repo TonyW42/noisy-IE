@@ -295,7 +295,7 @@ def train_MLM(args):
         num_training_steps=num_training_steps
     )
     logger = None ## TODO: add logger to track progress
-    classifier = MLM_classifier_(
+    classifier = MTL_classifier(
         model = model, 
         cfg = args,
         criterion = criterion, 

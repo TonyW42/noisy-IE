@@ -664,6 +664,7 @@ class flat_MTL_w_base(nn.Module):
         super().__init__()
         self.args = args
         self.base = base
+        self.lin_layer_dict = nn.ModuleDict()
         for model_name in base.model_dict:
             # add one linear layer per model
             lin_layer = nn.Linear(self.args.embed_size_dict[model_name], args.num_labels)
@@ -673,7 +674,7 @@ class flat_MTL_w_base(nn.Module):
         self.logits_dict = dict()
         hidden_states_dict = self.base(input_info_dict)
         for model_name in self.lin_layer_dict:
-            self.logits_dict[model_name] = self.lin_layer_dict[model_name](self.hidden_states_dict[model_name])
+            self.logits_dict[model_name] = self.lin_layer_dict[model_name](hidden_states_dict[model_name])
         return self.logits_dict
 
 class flat_MLM_w_base(nn.Module):
