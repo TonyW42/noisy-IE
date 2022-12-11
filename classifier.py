@@ -271,6 +271,8 @@ def train_MLM(args):
     logger = None ## TODO: add logger to track progress
 
 
+    train_epochs = args.n_epochs
+    args.n_epochs = args.mlm_epochs
     MLM_classifier_ = MLM_classifier(
         model = MLM_model, 
         cfg = args,
@@ -295,6 +297,8 @@ def train_MLM(args):
         num_training_steps=num_training_steps
     )
     logger = None ## TODO: add logger to track progress
+
+    args.n_epochs = train_epochs
     classifier = MTL_classifier(
         model = model, 
         cfg = args,
