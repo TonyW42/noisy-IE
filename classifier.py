@@ -34,6 +34,46 @@ def custom_collate(data, seq_len=512): #(2)
     return return_dict
 
 
+def custom_collate_SST(data, seq_len=512, probability=0.15): #(2)
+    model_names = list(data[0].keys())
+    batch_size = len(data)
+    input_ids = []
+    labels = []
+    attention_mask = []
+    for m_name in model_names:
+      for i in range(batch_size):
+        input_ids.append(data[i][m_name]['input_ids'][:seq_len])
+    for m_name in model_names:
+      for i in range(batch_size):
+        attention_mask.append(data[i][m_name]['attention_mask'][:seq_len])
+    input_ids = pad_sequence(input_ids, batch_first=True, padding_value=1) 
+    labels = input_ids.clone()
+    attention_mask = pad_sequence(attention_mask, batch_first=True, padding_value=0) 
+
+    rand = torch.rand(input_ids.shape)
+    # where the random array is less than 0.15, we set true
+    mask_arr = rand < probability
+    mask_arr = mask_arr * (input_ids != -100)
+
+    selection = []
+
+    for i in range(input_ids.shape[0]):
+        selection.append(
+            torch.flatten(mask_arr[i].nonzero()).tolist()
+        )
+
+    for i in range(input_ids.shape[0]):
+        labels[i, selection[i]] = -100
+
+    return_dict = defaultdict(defaultdict)
+    for i, m_name in enumerate(model_names):
+        return_dict[m_name]['input_ids'] = input_ids[i * batch_size : (i+1) * batch_size]
+        return_dict[m_name]['labels'] = labels[i * batch_size : (i+1) * batch_size]
+        return_dict[m_name]['attention_mask'] = attention_mask[i * batch_size : (i+1) * batch_size]
+    
+    return return_dict
+
+
 def fetch_loaders(model_names, args):
     from datasets import load_dataset
     wnut = load_dataset("wnut_17")
@@ -80,9 +120,9 @@ def fetch_loaders_SST(model_names, args):
     test_encoding_list = []
     for model_name in model_names:
         tokenizer = AutoTokenizer.from_pretrained(model_name, add_prefix_space=True) ## changed here
-        xlm_train_encoding = tokenizer(sst['train']["sentense"], padding="longest",truncation=True, is_split_into_words=True)
-        xlm_valid_encoding = tokenizer(sst['validation']["sentense"], padding="longest", truncation=True, is_split_into_words=True)
-        xlm_test_encoding = tokenizer(sst['test']["sentense"], padding="longest", truncation=True, is_split_into_words=True)
+        xlm_train_encoding = tokenizer(sst['train']["sentence"], padding="longest",truncation=True)
+        xlm_valid_encoding = tokenizer(sst['validation']["sentence"], padding="longest", truncation=True)
+        xlm_test_encoding = tokenizer(sst['test']["sentence"], padding="longest", truncation=True)
 
         train_encoding_list.append(xlm_train_encoding)
         valid_encoding_list.append(xlm_valid_encoding)
@@ -91,15 +131,15 @@ def fetch_loaders_SST(model_names, args):
     data_train = SSTDatasetMulti(train_encoding_list, model_names)
     data_valid = SSTDatasetMulti(valid_encoding_list, model_names)
     data_test = SSTDatasetMulti(test_encoding_list, model_names)
-    
+    print(len(data_train))
     loader_train = torch.utils.data.DataLoader(
-        data_train, batch_size=args.train_batch_size, collate_fn=custom_collate
+        data_train, batch_size=args.train_batch_size, collate_fn=custom_collate_SST
     )
     loader_valid = torch.utils.data.DataLoader(
-        data_valid, batch_size=args.eval_batch_size, collate_fn=custom_collate
+        data_valid, batch_size=args.eval_batch_size, collate_fn=custom_collate_SST
     )
     loader_test = torch.utils.data.DataLoader(
-        data_test, batch_size=args.test_batch_size, collate_fn=custom_collate
+        data_test, batch_size=args.test_batch_size, collate_fn=custom_collate_SST
     )
     return loader_train, loader_valid, loader_test
 
@@ -211,13 +251,13 @@ def train_MLM(args):
         criterion[model_name] = torch.nn.CrossEntropyLoss().to(args.device)
     # criterion = torch.nn.CrossEntropyLoss().to(args.device) ## weight the loss if you wish
     print(" ====== parameters? ========")
-    for name, p in model.named_parameters():
+    for name, p in MLM_model.named_parameters():
         print(name)
     # params = [p for p in model.parameters()]
     # for name in model.model_dict:
     #   for p in model.model_dict[name].parameters():
     #     params.append(p)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    optimizer = torch.optim.AdamW(MLM_model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     # trainloader, devloader, testloader = fetch_loaders(model_names, args) ## TODO: get data
     ## TODO: fix fetch_loaders_SST function
     trainloader, devloader, testloader = fetch_loaders_SST(model_names, args)
@@ -231,8 +271,10 @@ def train_MLM(args):
     logger = None ## TODO: add logger to track progress
 
 
-    MLM_classifier = MTL_classifier(
-        model = model, 
+    train_epochs = args.n_epochs
+    args.n_epochs = args.mlm_epochs
+    MLM_classifier_ = MLM_classifier(
+        model = MLM_model, 
         cfg = args,
         criterion = criterion, 
         optimizer = optimizer, 
@@ -240,7 +282,7 @@ def train_MLM(args):
         device = args.device,
         logger = logger 
     )
-    MLM_classifier.train(args, trainloader, testloader)  ## train MLM
+    MLM_classifier_.train(args, trainloader, testloader)  ## train MLM
 
     #####################################################################
     model = flat_MTL_w_base(base = base, args = args).to(args.device)
@@ -255,6 +297,8 @@ def train_MLM(args):
         num_training_steps=num_training_steps
     )
     logger = None ## TODO: add logger to track progress
+
+    args.n_epochs = train_epochs
     classifier = MTL_classifier(
         model = model, 
         cfg = args,

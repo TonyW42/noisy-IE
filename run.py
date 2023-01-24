@@ -52,12 +52,13 @@ if __name__ == '__main__':
     parser.add_argument('--mode', type=str, default="train")
     parser.add_argument('--device', type=str, default=None)
     parser.add_argument('--ensemble_method', type=str, default="default")
-    parser.add_argument('--model_list', type = str, default = "roberta-base|bert-base-case")
+    parser.add_argument('--model_list', type = str, default = "roberta-base|bert-base-cased")
     parser.add_argument('--word_model', type = str, default = "roberta-base")
     parser.add_argument('--num_att_layers', type = int, default = 6)
     parser.add_argument('--expr', type = str, default = "MTL") ## change back to MTL
     parser.add_argument('--save', type = str, default = "true")
     parser.add_argument('--layer_type', type=str, default='att')
+    parser.add_argument('--mlm_epochs', type=int, default=100) 
 
     parser.add_argument('--granularities_model', type=dict, 
                         default= {"character": "google/canine-s",

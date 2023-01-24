@@ -84,7 +84,7 @@ class SSTDatasetMulti(torch.utils.data.Dataset):
         return result
 
     def __len__(self):
-        return len(self.encodings[self.model_names[0]]) ## TODO HERE!
+        return len(self.encodings[0]["input_ids"]) ## TODO HERE!
 
 
 ## need dataset/loader structure such as the following:
@@ -231,6 +231,46 @@ class attention_MTL(nn.Module):
     
         return self.logits_dict ## {model_name: logit}
 
+
+# do not eval
+class MLM_classifier(BaseEstimator):
+    def step(self, data):
+        self.optimizer.zero_grad()
+        logits_dict = self.model(
+            input_info_dict = data
+        )
+        if self.mode == "train":
+            count = 0
+            for model_name, logit in logits_dict.items():
+                vocab_size = 1114112 if model_name == 'google/canine-s' else self.model.base.model_dict[model_name].config.vocab_size
+                if count == 0: 
+                    loss = self.criterion[model_name](logit.view(-1, vocab_size), data[model_name]["labels"].view(-1).to(self.cfg.device))
+                else: 
+                    loss += self.criterion[model_name](logit.view(-1, vocab_size), data[model_name]["labels"].view(-1).to(self.cfg.device))
+                count += 1
+            loss.backward()
+            self.optimizer.step()
+            if self.scheduler is not None:
+                self.scheduler.step()
+            for key, val in logits_dict.items():
+                logits_dict[key] = val.detach().cpu()
+            self.optimizer.zero_grad()
+            return {
+                "loss" : loss.detach().cpu().item(), 
+                "logits_dict" : logits_dict, ## softmax this 
+                "label" : data[self.cfg.word_model]["input_ids"]
+                    }
+        elif self.mode in ("dev", "test"):
+            for key, val in logits_dict.items():
+                logits_dict[key] = val.detach().cpu()
+            return {
+                "loss" : None, 
+                "logits_dict" : logits_dict,
+                "label" : data[self.cfg.word_model]["input_ids"]
+                }
+    def _eval(self, evalloader): 
+      print('we do not eval')
+        
         
 
 class MTL_classifier(BaseEstimator):
@@ -586,7 +626,7 @@ class MTL_base(nn.Module):
             ## get information
             model = self.model_dict[model_name]
             input_info = input_info_dict[model_name]
-            input_ids, attn_mask, token_type_ids = input_info["input_ids"], input_info["attention_mask"], input_info["labels"]
+            input_ids, attn_mask, token_ids = input_info["input_ids"], input_info["attention_mask"], input_info["labels"]
             ## get contexualized representation
             # print(input_ids.shape)
             encoded = model(return_dict = True, output_hidden_states=True, input_ids=input_ids.to(self.args.device), attention_mask = attn_mask.to(self.args.device))
@@ -624,6 +664,7 @@ class flat_MTL_w_base(nn.Module):
         super().__init__()
         self.args = args
         self.base = base
+        self.lin_layer_dict = nn.ModuleDict()
         for model_name in base.model_dict:
             # add one linear layer per model
             lin_layer = nn.Linear(self.args.embed_size_dict[model_name], args.num_labels)
@@ -633,7 +674,7 @@ class flat_MTL_w_base(nn.Module):
         self.logits_dict = dict()
         hidden_states_dict = self.base(input_info_dict)
         for model_name in self.lin_layer_dict:
-            self.logits_dict[model_name] = self.lin_layer_dict[model_name](self.hidden_states_dict[model_name])
+            self.logits_dict[model_name] = self.lin_layer_dict[model_name](hidden_states_dict[model_name])
         return self.logits_dict
 
 class flat_MLM_w_base(nn.Module):
@@ -641,16 +682,18 @@ class flat_MLM_w_base(nn.Module):
         super().__init__()
         self.args = args
         self.base = base
+        self.lin_layer_dict = nn.ModuleDict()
         for model_name in base.model_dict:
             # add one linear layer per model
-            lin_layer = nn.Linear(self.args.embed_size_dict[model_name], base.model_dict[model_name].config.vocab_size)
+            vocab_size = 1114112 if model_name == 'google/canine-s' else base.model_dict[model_name].config.vocab_size
+            lin_layer = nn.Linear(self.args.embed_size_dict[model_name], vocab_size)
             self.lin_layer_dict[model_name] = lin_layer
     
     def forward(self, input_info_dict):
         self.logits_dict = dict()
         hidden_states_dict = self.base(input_info_dict)
         for model_name in self.lin_layer_dict:
-            self.logits_dict[model_name] = self.lin_layer_dict[model_name](self.hidden_states_dict[model_name])
+            self.logits_dict[model_name] = self.lin_layer_dict[model_name](hidden_states_dict[model_name])
         return self.logits_dict
 
 
@@ -691,21 +734,6 @@ class baseline_classifier(BaseEstimator):
             # loss = torch.tensor(0.00, requires_grad = True)
             loss.backward()
             self.optimizer.step()
-            # print("=========  step weight ===========")
-            # print(list(self.model.parameters())[0].grad)
-            # print(self.model.attention_layers[0].self_attention.query_lin.weight)
-            # print(self.model.attention_layers[2].in_proj_weight[0][:10])
-            # print(self.model.attention_layers[3].in_proj_weight[0][:10])
-            # print(self.model.attention_layers[4].in_proj_weight[0][:10])
-            # print(self.model.attention_layers[5].in_proj_weight[0][:10])
-            # print("==================================")
-
-            # print(self.model.attention_layers[0].out_proj.weight[0][:10])
-            # print(self.model.attention_layers[1].out_proj.weight[0][:10])
-            # print(self.model.attention_layers[2].out_proj.weight[0][:10])
-            # print(self.model.attention_layers[3].out_proj.weight[0][:10])
-            # print(self.model.attention_layers[4].out_proj.weight[0][:10])
-            # print(self.model.attention_layers[5].out_proj.weight[0][:10])
             if self.scheduler is not None:
                 self.scheduler.step()
             self.optimizer.zero_grad()
@@ -764,20 +792,19 @@ class baseline_classifier(BaseEstimator):
             results = self.evaluate_metric['f1'].compute(predictions=eval_pred, references=eval_ys, average='macro')
             print(f"====== F1 result: {results}======")
 
-            # if self.writer is not None: 
-            #     self.writer.add_scalar('dev/loss', loss, self.dev_step)
-            #     self.writer.add_scalar('dev/macro/auc', macro_auc, self.dev_step)
-            #     self.writer.add_scalar('dev/micro/auc', micro_auc, self.dev_step)
-            #     if self.pred_thold is not None: 
-            #         yhats = (probs > self.pred_thold).astype(int)
-            #         macros = precision_recall_fscore_support(ys, yhats, average='macro')
-            #         self.writer.add_scalar('dev/macro/precision', macros[0], self.dev_step)
-            #         self.writer.add_scalar('dev/macro/recall', macros[1], self.dev_step)
-            #         self.writer.add_scalar('dev/macro/f1', macros[2], self.dev_step)
-            #         micros = precision_recall_fscore_support(ys, yhats, average='micro')
-            #         self.writer.add_scalar('dev/micro/precision', micros[0], self.dev_step)
-            #         self.writer.add_scalar('dev/micro/recall', micros[1], self.dev_step)
-            #         self.writer.add_scalar('dev/micro/f1', micros[2], self.dev_step)
+            true_predictions = [
+                [id2tag[p] for (p, l) in zip(np.array(p_).ravel(), np.array(y_).ravel()) if l != -100]
+                for p_, y_ in zip(preds, ys)
+            ]
+            true_labels = [
+                [id2tag[l] for (p, l) in zip(np.array(p_).ravel(), np.array(y_).ravel()) if l != -100]
+                for p_, y_ in zip(preds, ys)
+            ]
+
+            result_ = self.evaluate_metric['all'].compute(predictions=true_predictions, references=true_labels, )
+            # print(f"{result_}")
+            print(f"===== *F1 result: {result_['overall_f1']}======")
+
         return eval_pred, eval_ys
 
 class self_attention(nn.Module):
