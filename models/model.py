@@ -686,7 +686,7 @@ class baseline_classifier(BaseEstimator):
             data = data
         )
         ## softmax the logit before loss! 
-        loss = self.criterion(logits.view(-1, self.cfg.num_labels), data[self.cfg.word_model]["labels"].view(-1).to(self.cfg.device))
+        loss = self.criterion(logits.view(-1c, self.cfg.num_labels), data[self.cfg.word_model]["labels"].view(-1).to(self.cfg.device))
         if self.mode == "train":
             # loss = torch.tensor(0.00, requires_grad = True)
             loss.backward()
@@ -974,8 +974,6 @@ class sequential_classifier(BaseEstimator):
             
         return preds, ys
 
-
-
 class JSD(nn.Module):
     def __init__(self):
         super().__init__()
@@ -1073,7 +1071,88 @@ class sequential_classifier_2(BaseEstimator):
             
         return preds, ys
 
+
+class BertLayer_bimodal(nn.Module):
+    def __init__(self, emb_size, intermeidate_size = None, dropout_p = 0.1, eps = 1e-12):
+        super().__init__()
+        ## attention layer 
+        self.self_attention = self_attention(emb_size = emb_size, dropout_p = dropout_p)
+        self.attention_dense = nn.Linear(emb_size, emb_size)
+        self.attention_layer_norm = nn.LayerNorm(emb_size, eps = eps)
+        self.attention_dropout = nn.Dropout(p = dropout_p)
+        ## intermediate layer 
+        if intermeidate_size is None: 
+            intermeidate_size = emb_size
+        self.interm_dense = nn.Linear(emb_size, intermeidate_size)
+        self.interm_af = nn.GELU()
+        ## output 
+        self.out_dense = nn.Linear(intermeidate_size, emb_size)
+        self.out_layer_norm =  nn.LayerNorm(emb_size, eps = eps)
+        self.out_dropout = nn.Dropout(dropout_p)
     
+    def add_norm(self, inputs, output, dense_layer, dropout, ln_layer):
+        output_dense = dense_layer(output)
+        droped_out = dropout(output_dense)
+        result = ln_layer(droped_out + inputs)
+        return result
+
+    def forward(self, query, key, value):
+        ## attention
+        attention_out = self.self_attention(query = query, key = key, value = value)["attn_output"]
+        ## add-norm 
+        attention_normed = self.add_norm(hidden_states, attention_out, 
+                                         self.attention_dense, self.attention_dropout,
+                                         self.attention_layer_norm)
+        ## intermediate 
+        forward_linear = self.interm_dense(attention_normed)
+        forward_act = self.interm_af(forward_linear)
+        ## output 
+        out = self.out_dense(forward_act)
+        out = self.add_norm(attention_normed, forward_act, self.out_dense,
+                            self.out_dropout, self.out_layer_norm)
+        return out 
+    
+
+class co_attention(nn.Module):
+    def __init__(self, emb_size):
+        self.emb_size = emb_size
+        self.cotrm = BertLayer_bimodal(emb_size = emb_size)
+        self.trm = BertLayer_bimodal(emb_size = emb_size)
+    
+    def forward(self, mod1, mod2):
+        co_trm = self.cotrm(query = mod1, key = mod2, value = mod2)
+        trm = self.trm(query = co_trm, key = co_trm, value = co_trm)
+        return trm 
+
+
+class bimodal_base(nn.Module):
+    def __init__(self, model_dict, args):
+        self.model_dict = model_dict
+        self.args = args
+        self.char_co_attention = nn.ModuleList([co_attention(args.emb_size) for i in range(args.k)])
+        self.word_co_attention = nn.ModuleList([co_attention(args.emb_size) for i in range(args.k)])
+
+    def forward(self, data):
+        char_data = data["char"]
+        word_data = data["word"]
+        char_encoded = self.model_dict["char"](
+            input_ids = char_data["input_ids"].to(self.args.device),
+            attention_mask = char_data["input_ids"].to(self.args.device)
+        )
+        word_encoded = self.model_dict["word"](
+            input_ids = word_data["input_ids"].to(self.args.device),
+            attention_mask = word_data["input_ids"].to(self.args.device)
+        )
+        char_hidden = char_encoded["last_hidden_state"]
+        word_hidden = word_encoded["last_hidden_state"]
+        for i in range(self.args.k):
+            char_new = self.char_co_attention(mod1 = char_hidden, mod2 = word_hidden)
+            word_new = self.char_co_attention(mod1 = word_hidden, mod2 = char_hidden)
+            char_hidden = char_new
+            word_hidden = word_new
+        return {
+            "char": char_hidden,
+            "word": word_hidden}
     
             
 
