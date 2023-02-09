@@ -99,6 +99,8 @@ if __name__ == '__main__':
         train_sequential_2(args)
     elif args.expr == "mlm":
         train_MLM(args)
+    elif args.expr == "mlm_c": 
+        train_MLM_corpus(args)
     else:
         train(args)
 

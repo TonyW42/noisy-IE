@@ -1,10 +1,21 @@
 import torch
-import transformers 
+import transformers
 from models.model import *
 import numpy as np
-from transformers import AutoModel, AutoTokenizer, DataCollatorForTokenClassification, get_scheduler, AutoModelForMaskedLM
-import torch 
-from utils.fetch_loader import fetch_loaders, fetch_loaders2, fetch_loaders_SST, fetch_loader_book_wiki
+from transformers import (
+    AutoModel,
+    AutoTokenizer,
+    DataCollatorForTokenClassification,
+    get_scheduler,
+    AutoModelForMaskedLM,
+)
+import torch
+from utils.fetch_loader import (
+    fetch_loaders,
+    fetch_loaders2,
+    fetch_loaders_SST,
+    fetch_loader_book_wiki,
+)
 import pickle
 import time
 
@@ -14,8 +25,10 @@ def train(args):
     model_names = args.model_list.split("|")
     model_dict = torch.nn.ModuleDict()
     for model_name in model_names:
-        model_dict[model_name] = AutoModel.from_pretrained(model_name, num_labels=args.num_labels)
-    model = flat_MTL(model_dict = model_dict, args = args).to(args.device)
+        model_dict[model_name] = AutoModel.from_pretrained(
+            model_name, num_labels=args.num_labels
+        )
+    model = flat_MTL(model_dict=model_dict, args=args).to(args.device)
 
     criterion = torch.nn.ModuleDict()
     for model_name in model_names:
@@ -28,7 +41,9 @@ def train(args):
     # for name in model.model_dict:
     #   for p in model.model_dict[name].parameters():
     #     params.append(p)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    optimizer = torch.optim.AdamW(
+        model.parameters(), lr=args.lr, weight_decay=args.weight_decay
+    )
     # trainloader, devloader, testloader = fetch_loaders(model_names, args) ## TODO: get data
     trainloader, devloader, testloader = fetch_loaders2(model_names, args)
     print("new fetch loaders")
@@ -37,40 +52,42 @@ def train(args):
         "linear",
         optimizer=optimizer,
         num_warmup_steps=0,
-        num_training_steps=num_training_steps
+        num_training_steps=num_training_steps,
     )
-    logger = None ## TODO: add logger to track progress
-
+    logger = None  ## TODO: add logger to track progress
 
     classifier = MTL_classifier(
-        model = model, 
-        cfg = args,
-        criterion = criterion, 
-        optimizer = optimizer, 
-        scheduler = scheduler, 
-        device = args.device,
-        logger = logger 
+        model=model,
+        cfg=args,
+        criterion=criterion,
+        optimizer=optimizer,
+        scheduler=scheduler,
+        device=args.device,
+        logger=logger,
     )
 
     if args.mode == "train":
         classifier.train(args, trainloader, testloader)
 
     if args.mode == "test":
-        pass 
+        pass
         # use functions from evaluate_utils to test model.
 
-    ## do something to evaluate the model  
-    ## Note: could evaluate using seqeval in the estimator's _eval() function 
-    ## need to re-write the _eval() function for token classification. 
+    ## do something to evaluate the model
+    ## Note: could evaluate using seqeval in the estimator's _eval() function
+    ## need to re-write the _eval() function for token classification.
+
 
 def train_MLM(args):
     ## initialize model
     model_names = args.model_list.split("|")
     model_dict = torch.nn.ModuleDict()
     for model_name in model_names:
-        model_dict[model_name] = AutoModel.from_pretrained(model_name, num_labels=args.num_labels)
-    base = MTL_base(model_dict = model_dict, args = args).to(args.device)
-    MLM_model = flat_MLM_w_base(base = base, args = args).to(args.device)
+        model_dict[model_name] = AutoModel.from_pretrained(
+            model_name, num_labels=args.num_labels
+        )
+    base = MTL_base(model_dict=model_dict, args=args).to(args.device)
+    MLM_model = flat_MLM_w_base(base=base, args=args).to(args.device)
 
     criterion = torch.nn.ModuleDict()
     for model_name in model_names:
@@ -83,7 +100,9 @@ def train_MLM(args):
     # for name in model.model_dict:
     #   for p in model.model_dict[name].parameters():
     #     params.append(p)
-    optimizer = torch.optim.AdamW(MLM_model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    optimizer = torch.optim.AdamW(
+        MLM_model.parameters(), lr=args.lr, weight_decay=args.weight_decay
+    )
     # trainloader, devloader, testloader = fetch_loaders(model_names, args) ## TODO: get data
     ## TODO: fix fetch_loaders_SST function
     trainloader, devloader, testloader = fetch_loaders_SST(model_names, args)
@@ -92,27 +111,28 @@ def train_MLM(args):
         "linear",
         optimizer=optimizer,
         num_warmup_steps=0,
-        num_training_steps=num_training_steps
+        num_training_steps=num_training_steps,
     )
-    logger = None ## TODO: add logger to track progress
-
+    logger = None  ## TODO: add logger to track progress
 
     train_epochs = args.n_epochs
     args.n_epochs = args.mlm_epochs
     MLM_classifier_ = MLM_classifier(
-        model = MLM_model, 
-        cfg = args,
-        criterion = criterion, 
-        optimizer = optimizer, 
-        scheduler = scheduler, 
-        device = args.device,
-        logger = logger 
+        model=MLM_model,
+        cfg=args,
+        criterion=criterion,
+        optimizer=optimizer,
+        scheduler=scheduler,
+        device=args.device,
+        logger=logger,
     )
     MLM_classifier_.train(args, trainloader, testloader)  ## train MLM
 
     #####################################################################
-    model = flat_MTL_w_base(base = base, args = args).to(args.device)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    model = flat_MTL_w_base(base=base, args=args).to(args.device)
+    optimizer = torch.optim.AdamW(
+        model.parameters(), lr=args.lr, weight_decay=args.weight_decay
+    )
     # trainloader, devloader, testloader = fetch_loaders(model_names, args) ## TODO: get data
     trainloader, devloader, testloader = fetch_loaders2(model_names, args)
     num_training_steps = args.n_epochs * len(trainloader)
@@ -120,23 +140,22 @@ def train_MLM(args):
         "linear",
         optimizer=optimizer,
         num_warmup_steps=0,
-        num_training_steps=num_training_steps
+        num_training_steps=num_training_steps,
     )
-    logger = None ## TODO: add logger to track progress
+    logger = None  ## TODO: add logger to track progress
 
     args.n_epochs = train_epochs
     classifier = MTL_classifier(
-        model = model, 
-        cfg = args,
-        criterion = criterion, 
-        optimizer = optimizer, 
-        scheduler = scheduler, 
-        device = args.device,
-        logger = logger 
+        model=model,
+        cfg=args,
+        criterion=criterion,
+        optimizer=optimizer,
+        scheduler=scheduler,
+        device=args.device,
+        logger=logger,
     )
     if args.mode == "train":
         classifier.train(args, trainloader, testloader)
-
 
         # use functions from evaluate_utils to test model.
 
@@ -146,48 +165,53 @@ def train_MLM_corpus(args):
     model_names = args.model_list.split("|")
     model_dict = torch.nn.ModuleDict()
     for model_name in model_names:
-        model_dict[model_name] = AutoModel.from_pretrained(model_name, num_labels=args.num_labels)
+        model_dict[model_name] = AutoModel.from_pretrained(
+            model_name, num_labels=args.num_labels
+        )
 
-    '''
+    """
     Try to store MLM here, using a metadata table to map?
     TODO: time recorder
     TODO: metadata to store base model
-    '''
-    
-    base = MTL_base(model_dict = model_dict, args = args).to(args.device)
-    MLM_model = flat_MLM_w_base(base = base, args = args).to(args.device)
+    """
+
+    base = MTL_base(model_dict=model_dict, args=args).to(args.device)
+    MLM_model = flat_MLM_w_base(base=base, args=args).to(args.device)
 
     criterion = torch.nn.ModuleDict()
     for model_name in model_names:
         criterion[model_name] = torch.nn.CrossEntropyLoss().to(args.device)
-    optimizer = torch.optim.AdamW(MLM_model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    optimizer = torch.optim.AdamW(
+        MLM_model.parameters(), lr=args.lr, weight_decay=args.weight_decay
+    )
     trainloader, devloader, testloader = fetch_loader_book_wiki(model_names, args)
     num_training_steps = args.n_epochs * len(trainloader)
     scheduler = get_scheduler(
         "linear",
         optimizer=optimizer,
         num_warmup_steps=0,
-        num_training_steps=num_training_steps
+        num_training_steps=num_training_steps,
     )
-    logger = None ## TODO: add logger to track progress
-
+    logger = None  ## TODO: add logger to track progress
 
     train_epochs = args.n_epochs
     args.n_epochs = args.mlm_epochs
     MLM_classifier_ = MLM_classifier(
-        model = MLM_model, 
-        cfg = args,
-        criterion = criterion, 
-        optimizer = optimizer, 
-        scheduler = scheduler, 
-        device = args.device,
-        logger = logger 
+        model=MLM_model,
+        cfg=args,
+        criterion=criterion,
+        optimizer=optimizer,
+        scheduler=scheduler,
+        device=args.device,
+        logger=logger,
     )
     MLM_classifier_.train(args, trainloader, testloader)  ## train MLM
 
     #####################################################################
-    model = flat_MTL_w_base(base = base, args = args).to(args.device)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    model = flat_MTL_w_base(base=base, args=args).to(args.device)
+    optimizer = torch.optim.AdamW(
+        model.parameters(), lr=args.lr, weight_decay=args.weight_decay
+    )
     # trainloader, devloader, testloader = fetch_loaders(model_names, args) ## TODO: get data
     trainloader, devloader, testloader = fetch_loaders2(model_names, args)
     num_training_steps = args.n_epochs * len(trainloader)
@@ -195,62 +219,64 @@ def train_MLM_corpus(args):
         "linear",
         optimizer=optimizer,
         num_warmup_steps=0,
-        num_training_steps=num_training_steps
+        num_training_steps=num_training_steps,
     )
-    logger = None ## TODO: add logger to track progress
+    logger = None  ## TODO: add logger to track progress
 
     args.n_epochs = train_epochs
     classifier = MTL_classifier(
-        model = model, 
-        cfg = args,
-        criterion = criterion, 
-        optimizer = optimizer, 
-        scheduler = scheduler, 
-        device = args.device,
-        logger = logger 
+        model=model,
+        cfg=args,
+        criterion=criterion,
+        optimizer=optimizer,
+        scheduler=scheduler,
+        device=args.device,
+        logger=logger,
     )
     if args.mode == "train":
         classifier.train(args, trainloader, testloader)
-
 
         # use functions from evaluate_utils to test model.
 
 
 def train_baseline(args):
-    model = baseline_model(args = args).to(args.device)
+    model = baseline_model(args=args).to(args.device)
     criterion = torch.nn.CrossEntropyLoss().to(args.device)
-    optimizer = torch.optim.AdamW(model.parameters(),lr=args.lr)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
     trainloader, devloader, testloader = fetch_loaders([args.word_model], args)
     num_training_steps = args.n_epochs * len(trainloader)
     scheduler = get_scheduler(
         "linear",
         optimizer=optimizer,
         num_warmup_steps=0,
-        num_training_steps=num_training_steps
+        num_training_steps=num_training_steps,
     )
     logger = None
     classifier = baseline_classifier(
-        model = model, 
-        cfg = args,
-        criterion = criterion, 
-        optimizer = optimizer, 
-        scheduler = scheduler, 
-        device = args.device,
-        logger = logger 
+        model=model,
+        cfg=args,
+        criterion=criterion,
+        optimizer=optimizer,
+        scheduler=scheduler,
+        device=args.device,
+        logger=logger,
     )
     if args.mode == "train":
         classifier.train(args, trainloader, testloader)
 
     if args.mode == "test":
-        pass 
+        pass
+
 
 def train_sequential(args):
     ## initialize model
     model_names = args.model_list.split("|")
     model_dict = torch.nn.ModuleDict()
     for model_name in model_names:
-        model_dict[model_name] = AutoModel.from_pretrained(model_name, num_labels=args.num_labels)
-    model = sequential_MTL(model_dict = model_dict, args = args).to(args.device)
+        model_dict[model_name] = AutoModel.from_pretrained(
+            model_name, num_labels=args.num_labels
+        )
+    model = sequential_MTL(model_dict=model_dict, args=args).to(args.device)
 
     criterion = torch.nn.ModuleDict()
     for model_name in model_names:
@@ -263,7 +289,9 @@ def train_sequential(args):
     # for name in model.model_dict:
     #   for p in model.model_dict[name].parameters():
     #     params.append(p)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    optimizer = torch.optim.AdamW(
+        model.parameters(), lr=args.lr, weight_decay=args.weight_decay
+    )
     # trainloader, devloader, testloader = fetch_loaders(model_names, args) ## TODO: get data
     trainloader, devloader, testloader = fetch_loaders2(model_names, args)
     num_training_steps = args.n_epochs * len(trainloader)
@@ -271,39 +299,39 @@ def train_sequential(args):
         "linear",
         optimizer=optimizer,
         num_warmup_steps=0,
-        num_training_steps=num_training_steps
+        num_training_steps=num_training_steps,
     )
-    logger = None ## TODO: add logger to track progress
-
+    logger = None  ## TODO: add logger to track progress
 
     classifier = sequential_classifier(
-        model = model, 
-        cfg = args,
-        criterion = criterion, 
-        optimizer = optimizer, 
-        scheduler = scheduler, 
-        device = args.device,
-        logger = logger 
+        model=model,
+        cfg=args,
+        criterion=criterion,
+        optimizer=optimizer,
+        scheduler=scheduler,
+        device=args.device,
+        logger=logger,
     )
-    classifier.JSD = JSD() ## need to have JSD 
+    classifier.JSD = JSD()  ## need to have JSD
 
     if args.mode == "train":
         classifier.train(args, trainloader, testloader)
 
     if args.mode == "test":
-        pass 
+        pass
         # use functions from evaluate_utils to test model.
 
-    ## do something to evaluate the model  
-    ## Note: could evaluate using seqeval in the estimator's _eval() function 
-    ## need to re-write the _eval() function for token classification. 
+    ## do something to evaluate the model
+    ## Note: could evaluate using seqeval in the estimator's _eval() function
+    ## need to re-write the _eval() function for token classification.
+
 
 def train_sequential_2(args):
     ## initialize model
     model_names = args.model_list.split("|")
     model_dict = torch.nn.ModuleDict()
     for model_name in model_names:
-        model_dict[model_name] = base_model(model_name, args = args).to(args.device)
+        model_dict[model_name] = base_model(model_name, args=args).to(args.device)
 
     criterion = torch.nn.CrossEntropyLoss().to(args.device)
     trainloader, devloader, testloader = fetch_loaders2(model_names, args)
@@ -312,39 +340,41 @@ def train_sequential_2(args):
     optimizer_dict = dict()
     scheduler_dict = dict()
     for model_name in model_names:
-        optimizer = torch.optim.AdamW(model_dict[model_name].parameters(),
-                                      lr=args.lr, weight_decay=args.weight_decay)
+        optimizer = torch.optim.AdamW(
+            model_dict[model_name].parameters(),
+            lr=args.lr,
+            weight_decay=args.weight_decay,
+        )
         scheduler = get_scheduler(
             "linear",
             optimizer=optimizer,
             num_warmup_steps=0,
-            num_training_steps=num_training_steps
-        ) 
+            num_training_steps=num_training_steps,
+        )
         optimizer_dict[model_name] = optimizer
         scheduler_dict[model_name] = scheduler
 
     # trainloader, devloader, testloader = fetch_loaders(model_names, args) ## TODO: get data
-    logger = None ## TODO: add logger to track progress
-
+    logger = None  ## TODO: add logger to track progress
 
     classifier = sequential_classifier_2(
-        model = model_dict, 
-        cfg = args,
-        criterion = criterion, 
-        optimizer = optimizer_dict, 
-        scheduler = scheduler_dict, 
-        device = args.device,
-        logger = logger 
+        model=model_dict,
+        cfg=args,
+        criterion=criterion,
+        optimizer=optimizer_dict,
+        scheduler=scheduler_dict,
+        device=args.device,
+        logger=logger,
     )
-    classifier.prob_loss = torch.nn.MSELoss() ## need to have JSD 
+    classifier.prob_loss = torch.nn.MSELoss()  ## need to have JSD
 
     if args.mode == "train":
         classifier.train(args, trainloader, testloader)
 
     if args.mode == "test":
-        pass 
+        pass
         # use functions from evaluate_utils to test model.
 
-    ## do something to evaluate the model  
-    ## Note: could evaluate using seqeval in the estimator's _eval() function 
-    ## need to re-write the _eval() function for token classification. 
+    ## do something to evaluate the model
+    ## Note: could evaluate using seqeval in the estimator's _eval() function
+    ## need to re-write the _eval() function for token classification.
