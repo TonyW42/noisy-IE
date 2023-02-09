@@ -3,7 +3,7 @@ from torch.nn.utils.rnn import pad_sequence #(1)
 from collections import defaultdict
 from transformers import AutoModel, AutoTokenizer, DataCollatorForTokenClassification, get_scheduler, AutoModelForMaskedLM
 import torch 
-from models.model import encode_tags, WNUTDatasetMulti, wnut_multiple_granularity
+from models.model import SSTDatasetMulti, encode_tags, WNUTDatasetMulti, wnut_multiple_granularity
 from datasets import load_dataset
 import os
 import pickle

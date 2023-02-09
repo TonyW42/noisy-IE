@@ -6,6 +6,7 @@ from transformers import AutoModel, AutoTokenizer, DataCollatorForTokenClassific
 import torch 
 from utils.fetch_loader import fetch_loaders, fetch_loaders2, fetch_loaders_SST, fetch_loader_book_wiki
 import pickle
+import time
 
 
 def train(args):
@@ -149,7 +150,10 @@ def train_MLM_corpus(args):
 
     '''
     Try to store MLM here, using a metadata table to map?
+    TODO: time recorder
+    TODO: metadata to store base model
     '''
+    
     base = MTL_base(model_dict = model_dict, args = args).to(args.device)
     MLM_model = flat_MLM_w_base(base = base, args = args).to(args.device)
 
