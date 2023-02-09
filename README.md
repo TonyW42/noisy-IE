@@ -62,15 +62,19 @@ We provide some example code for running our experiments below.
 ### Baseline experiment
 Here is one example command line code to run baseline experiments, with roberta-base
 
-```python3 run.py --mode train --model_list "roberta-base" --word_model roberta-base \
+```
+python3 run.py --mode train --model_list "roberta-base" --word_model roberta-base \
                 --num_att_layers 0 --mode train --bs 32 --train_batch_size 10 --eval_batch_size 10 --test_batch_size 10 \
                 --weight_decay 1e-8 --lr 2e-5 --n_epochs 50 --expr baseline \
-                --granularities "subword_50k"```
+                --granularities "subword_50k"
+```
 
 ### Entanglement model
 Here is one example command line code to run a basic extanglement model, with roberta-base and canine, using 4 attention layers as alignment layer
 
-``` python3 run.py --mode train --model_list "roberta-base|google/canine-s" --word_model roberta-base \
+``` 
+python3 run.py --mode train --model_list "roberta-base|google/canine-s" --word_model roberta-base \
                 --num_att_layers 4 --mode train --bs 32 --train_batch_size 10 --eval_batch_size 10 --test_batch_size 10 \
                 --weight_decay 1e-8 --lr 2e-5 --n_epochs 50 --expr MTL \
-                --granularities "character,subword_50k"```
+                --granularities "character,subword_50k"
+```
