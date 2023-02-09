@@ -30,15 +30,15 @@ We provide a wrapper file that allows you to replicate our experiments using com
 * `--model_list`: the list of model in the entanglement model separated by `|`. In the standard setting, we will use the character/word granularity. Therefore, the default option will be "roberta-base|google/canine-s"
 
 * `--expr`: experiment. With a few specification:
-- `baseline`: baseline experiment, single model + linear classification head 
-- `MTL`: run the standard entanglement model. 
-- `mlm`: run masked-language pretraining before evaluating on WNUT-17 (still under improvement)
+    - `baseline`: baseline experiment, single model + linear classification head 
+    - `MTL`: run the standard entanglement model. 
+    - `mlm`: run masked-language pretraining before evaluating on WNUT-17 (still under improvement)
 
 * `--word_model`: the model used to evaluate on WNUT-17. This is necessary when you want to include more than 1 subword model. 
 
 * `--layer_type`: The type of alignment layers. Can have two typess:
-- `attn`: simple attention layers 
-- `bert`: transformer layers (Vaswani, 2017) with residual connection and normalization. 
+    - `attn`: simple attention layers 
+    - `bert`: transformer layers (Vaswani, 2017) with residual connection and normalization. 
 
 * `--num_att_layers`: number of alignment layers
 
