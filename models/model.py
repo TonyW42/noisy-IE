@@ -729,7 +729,7 @@ class baseline_classifier(BaseEstimator):
             data = data
         )
         ## softmax the logit before loss! 
-        loss = self.criterion(logits.view(-1c, self.cfg.num_labels), data[self.cfg.word_model]["labels"].view(-1).to(self.cfg.device))
+        loss = self.criterion(logits.view(-1, self.cfg.num_labels), data[self.cfg.word_model]["labels"].view(-1).to(self.cfg.device))
         if self.mode == "train":
             # loss = torch.tensor(0.00, requires_grad = True)
             loss.backward()
