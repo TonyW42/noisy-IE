@@ -1,10 +1,12 @@
 from datasets import load_dataset, load_metric
 import numpy as np
+
 metric = load_metric("seqeval")
 wnut = load_dataset("wnut_17")
 
 label_list = wnut["train"].features[f"ner_tags"].feature.names
 # label_list
+
 
 def compute_metrics(p):
     predictions, labels = p
@@ -20,7 +22,7 @@ def compute_metrics(p):
         for prediction, label in zip(predictions, labels)
     ]
 
-    results = metric.compute(predictions=true_predictions, references=true_labels, )
+    results = metric.compute(predictions=true_predictions, references=true_labels,)
     return {
         "precision": results["overall_precision"],
         "recall": results["overall_recall"],

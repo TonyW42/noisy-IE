@@ -1,17 +1,17 @@
-import transformers 
+import transformers
 from transformers import AutoModel, AutoTokenizer
-import torch 
+import torch
 from torch import nn, optim
 from sklearn.metrics import roc_auc_score, precision_recall_fscore_support
 
-import numpy as np 
+import numpy as np
 import pandas as pd
-import random 
+import random
 
-import os 
+import os
 import argparse
 from datetime import datetime
-import tqdm 
+import tqdm
 
 from datasets import load_dataset
 
@@ -27,7 +27,7 @@ from math import hypot, sqrt, fabs, exp, erf, tau, log, fsum
 from operator import itemgetter
 from collections import Counter, namedtuple
 
-## set seed 
+## set seed
 def setup_seed(seed):
     torch.manual_seed(seed)
     if torch.cuda.is_available():
@@ -37,9 +37,11 @@ def setup_seed(seed):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
-def make_if_not_exists(new_dir): 
-    if not os.path.exists(new_dir): 
-        os.system('mkdir -p {}'.format(new_dir))
+
+def make_if_not_exists(new_dir):
+    if not os.path.exists(new_dir):
+        os.system("mkdir -p {}".format(new_dir))
+
 
 #################################################################
 ####  find mode
@@ -63,7 +65,7 @@ def mode(data):
     try:
         return pairs[0][0]
     except IndexError:
-        raise RuntimeError('no mode for empty data') from None
+        raise RuntimeError("no mode for empty data") from None
 
 
 def multimode(data):
@@ -80,6 +82,8 @@ def multimode(data):
     counts = Counter(iter(data)).most_common()
     maxcount, mode_items = next(groupby(counts, key=itemgetter(1)), (0, []))
     return list(map(itemgetter(0), mode_items))
+
+
 #################################################################
 
 
@@ -90,10 +94,11 @@ def flatten_2d(L):
             new.append(l_i)
     return new
 
+
 def scaled_dot_product_attention(query, key, value):
-    '''
+    """
     scaled dot product attention in 'attention is all you need'
-    '''
+    """
     key_transpose = key.transpose(1, 2)
     result = torch.matmul(query, key_transpose)
 
@@ -105,13 +110,9 @@ def get_batch_ids(n, bs):
     while remaining_len >= bs:
         sampled = random.sample(remaining)
         bs_ids.extend(sampled)
-        for s in sampled: remaining.remove(s)
+        for s in sampled:
+            remaining.remove(s)
         remaining_len = len(remaining)
-    if remaining_len != 0: bs_ids.extend(remaining)
-    return bs_ids ## [[ids for batch 1], [ids for batch 2], ...]
-
-
-    
-
-
-
+    if remaining_len != 0:
+        bs_ids.extend(remaining)
+    return bs_ids  ## [[ids for batch 1], [ids for batch 2], ...]
