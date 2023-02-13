@@ -378,3 +378,55 @@ def train_sequential_2(args):
     ## do something to evaluate the model
     ## Note: could evaluate using seqeval in the estimator's _eval() function
     ## need to re-write the _eval() function for token classification.
+
+
+
+def train_bimodal_MLM(args):
+    ## initialize model
+    model_dict = torch.nn.ModuleDict()
+    model_dict["char"] =  AutoModel.from_pretrained(args.char_model)
+    model_dict["word"] =  AutoModel.from_pretrained(args.word_model)
+
+    base = bimodal_base(model_dict=model_dict, args=args).to(args.device)
+    MLM_model = bimodal_pretrain(base=base, args=args).to(args.device)
+
+    criterion = torch.nn.CrossEntropyLoss()
+
+    # criterion = torch.nn.CrossEntropyLoss().to(args.device) ## weight the loss if you wish
+    print(" ====== parameters? ========")
+    # for name, p in MLM_model.named_parameters():
+    #     print(name)
+    # params = [p for p in model.parameters()]
+    # for name in model.model_dict:
+    #   for p in model.model_dict[name].parameters():
+    #     params.append(p)
+    ## NOTE: freeze parameters??
+    optimizer = torch.optim.AdamW(
+        MLM_model.parameters(), lr=args.lr, weight_decay=args.weight_decay
+    )
+
+    ## TODO: get loaders 
+    trainloader, devloader, testloader = None
+    num_training_steps = args.n_epochs * len(trainloader)
+    scheduler = get_scheduler(
+        "linear",
+        optimizer=optimizer,
+        num_warmup_steps=0,
+        num_training_steps=num_training_steps,
+    )
+    logger = None  ## TODO: add logger to track progress
+
+    train_epochs = args.n_epochs
+    args.n_epochs = args.mlm_epochs
+    MLM_classifier_ = bimodal_trainer(
+        model=MLM_model,
+        cfg=args,
+        criterion=criterion,
+        optimizer=optimizer,
+        scheduler=scheduler,
+        device=args.device,
+        logger=logger,
+    )
+    MLM_classifier_.train(args, trainloader, testloader)  ## train MLM
+
+    ## TODO: evaluate on WNUT 17 and other task

@@ -60,6 +60,10 @@ if __name__ == '__main__':
     parser.add_argument('--layer_type', type=str, default='att')
     parser.add_argument('--mlm_epochs', type=int, default=100) 
 
+    ## NOTE: newly added
+    parser.add_argument('--emb_size', type=int, default=768) 
+    parser.add_argument('--char_model', type=str, default="google/canine-s") 
+
     parser.add_argument('--granularities_model', type=dict, 
                         default= {"character": "google/canine-s",
                                 "subword_50k": "roberta-base",

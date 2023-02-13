@@ -1297,7 +1297,7 @@ class BertLayer_bimodal(nn.Module):
         ]
         ## add-norm
         attention_normed = self.add_norm(
-            hidden_states,
+            query,
             attention_out,
             self.attention_dense,
             self.attention_dropout,
@@ -1335,10 +1335,10 @@ class bimodal_base(nn.Module):
         self.model_dict = model_dict
         self.args = args
         self.char_co_attention = nn.ModuleList(
-            [co_attention(args.emb_size) for i in range(args.k)]
+            [co_attention(args.emb_size) for i in range(args.num_att_layers)]
         )
         self.word_co_attention = nn.ModuleList(
-            [co_attention(args.emb_size) for i in range(args.k)]
+            [co_attention(args.emb_size) for i in range(args.num_att_layers)]
         )
 
     def forward(self, data):
@@ -1356,10 +1356,107 @@ class bimodal_base(nn.Module):
         word_hidden = word_encoded["last_hidden_state"]
         for i in range(self.args.k):
             char_new = self.char_co_attention(mod1=char_hidden, mod2=word_hidden)
-            word_new = self.char_co_attention(mod1=word_hidden, mod2=char_hidden)
+            word_new = self.word_co_attention(mod1=word_hidden, mod2=char_hidden)
             char_hidden = char_new
             word_hidden = word_new
         return {"char": char_hidden, "word": word_hidden}
+
+
+class bimodal_pretrain(nn.Module):
+    def __init__(self, base, args):
+        args.char_vocab_size = base.model_dict["char"].config.vocab_size
+        args.word_vocab_size = base.model_dict["word"].config.vocab_size
+        self.base = base
+        self.char_mlm_layer = nn.Linear(args.emb_size, args.char_vocab_size)
+        self.word_mlm_layer = nn.Linear(args.emb_size, args.word_vocab_size)
+        self.logit_scale = nn.Parameter(torch.ones([]) * np.log(1 / 0.07))
+
+    
+    def forward(self, data):
+        encoded = self.base(data = data)
+        char_mlm_logits = self.char_mlm_layer(encoded["word"])
+        word_mlm_logits = self.word_mlm_layer(encoded["word"])
+        ## TODO: check correctness 
+        ## TODO: check whether word/char is aligned. 
+        similarity = torch.matmul(encoded["word"], encoded["char"]) / self.logit_scale
+        return {
+            "char": char_mlm_logits, 
+            "word": word_mlm_logits, 
+            "similarity": similarity 
+        }
+
+
+
+class bimodal_trainer(BaseEstimator):
+    def step(self, data):
+        self.optimizer.zero_grad()
+        logits_dict = self.model(data=data)
+        ## TODO: check data structure
+        char_mlm_loss = self.criterion(logits_dict["char"], data["char_input_ids"])
+        word_mlm_loss = self.criterion(logits_dict["word"], data["word_input_ids"])
+        ## TODO: check dimension here
+        alignment_loss = self.criterion(logits_dict["similarity"], data["char_word_ids"])
+        ## TODO: weight loss
+        loss = char_mlm_loss + word_mlm_loss  + alignment_loss
+        if self.mode == "train":
+            loss.backward()
+            self.optimizer.step()
+            if self.scheduler is not None:
+                self.scheduler.step()
+            
+            self.optimizer.zero_grad()
+        elif self.mode in ("dev", "test"):
+            pass
+        for key, val in logits_dict.items():
+            logits_dict[key] = val.detach().cpu()
+        return {
+                    "loss": loss.detach().cpu().item(),
+                    "char_mlm_loss": char_mlm_loss.detach().cpu().item(),
+                    "word_mlm_loss": word_mlm_loss.detach().cpu().item(),
+                    "alignment_loss": alignment_loss.detach().cpu().item(),
+                    "logits_dict": logits_dict
+                }
+            
+
+    def _eval(self, evalloader):
+        self.model.eval()
+        tbar = tqdm(evalloader, dynamic_ncols=True)
+        loss, char_mlm_loss, word_mlm_loss, alignment_loss = [], [], [],[]
+        
+
+
+        if self.evaluate_metric is None:
+            self.evaluate_metric = dict()
+            self.evaluate_metric["f1"] = evaluate.load("f1")
+            self.evaluate_metric["all"] = load_metric("seqeval")
+
+        for data in tbar:
+            ret_step = self.step(data)  ## y: [bs, seq_len]
+            loss.append(ret_step["loss"])
+            char_mlm_loss.append(ret_step["char_mlm_loss"])
+            word_mlm_loss.append(ret_step["word_mlm_loss"])
+            alignment_loss.append(ret_step["alignment_loss"])
+        mean_loss = np.mean(loss)
+        mean_char_mlm_loss = np.mean(char_mlm_loss)
+        mean_word_mlm_loss = np.mean(word_mlm_loss)
+        mean_alignment_loss = np.mean(alignment_loss)
+        print(f"mean loss: {mean_loss}")
+        print(f"mean_char_mlm_loss: {mean_char_mlm_loss}")
+        print(f"mean_word_mlm_loss: {mean_word_mlm_loss}")
+        print(f"mean_alignment_loss: {mean_alignment_loss}")
+        return {
+            "mean loss": mean_loss, 
+            "mean_char_mlm_loss": mean_char_mlm_loss,
+            "mean_word_mlm_loss": mean_word_mlm_loss, 
+            "mean_alignment_loss" : mean_alignment_loss
+        }
+
+        
+        
+            
+
+
+
 
 
 if __name__ == "__main__":
