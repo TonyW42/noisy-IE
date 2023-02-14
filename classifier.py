@@ -407,6 +407,10 @@ def train_bimodal_MLM(args):
 
     ## TODO: get loaders 
     trainloader, devloader, testloader = None
+    ## NOTE: structure of data 
+    ## data : {"char":  char_data, "word": word_data}
+    ## char_data: what returned by char tokenizer + word_id_for_char
+    ## word_data: what returned by word tokenizer
     num_training_steps = args.n_epochs * len(trainloader)
     scheduler = get_scheduler(
         "linear",

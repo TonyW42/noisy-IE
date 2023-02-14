@@ -1392,8 +1392,8 @@ class bimodal_trainer(BaseEstimator):
         self.optimizer.zero_grad()
         logits_dict = self.model(data=data)
         ## TODO: check data structure
-        char_mlm_loss = self.criterion(logits_dict["char"], data["char_input_ids"])
-        word_mlm_loss = self.criterion(logits_dict["word"], data["word_input_ids"])
+        char_mlm_loss = self.criterion(logits_dict["char"], data["char"]["input_ids"])
+        word_mlm_loss = self.criterion(logits_dict["word"], data["word"]["input_ids"])
         ## TODO: check dimension here
         alignment_loss = self.criterion(logits_dict["similarity"], data["char_word_ids"])
         ## TODO: weight loss
