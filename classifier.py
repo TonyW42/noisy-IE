@@ -15,6 +15,7 @@ from utils.fetch_loader import (
     fetch_loaders2,
     fetch_loaders_SST,
     fetch_loader_book_wiki,
+    fetch_loader_book_wiki_bimodal,
 )
 import pickle
 import time
@@ -406,7 +407,8 @@ def train_bimodal_MLM(args):
     )
 
     ## TODO: get loaders 
-    trainloader, devloader, testloader = None
+    model_names = args.model_list.split("|")
+    trainloader, devloader, testloader = fetch_loader_book_wiki_bimodal(model_names, args)
     ## NOTE: structure of data 
     ## data : {"char":  char_data, "word": word_data}
     ## char_data: what returned by char tokenizer + word_id_for_char

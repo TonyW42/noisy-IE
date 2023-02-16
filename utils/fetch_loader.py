@@ -10,6 +10,7 @@ from transformers import (
 import torch
 from models.model import (
     SSTDatasetMulti,
+    BookWikiDatasetMulti,
     encode_tags,
     WNUTDatasetMulti,
     wnut_multiple_granularity,
@@ -93,8 +94,6 @@ def custom_collate_SST(data, seq_len=512, probability=0.15):  # (2)
 
 
 def fetch_loaders(model_names, args):
-    from datasets import load_dataset
-
     wnut = load_dataset("wnut_17")
     train_encoding_list, train_label_list = [], []
     valid_encoding_list, valid_label_list = [], []
@@ -150,8 +149,6 @@ def fetch_loaders(model_names, args):
 
 
 def fetch_loaders_SST(model_names, args):
-    from datasets import load_dataset
-
     sst = load_dataset("sst")
     train_encoding_list = []
     valid_encoding_list = []
@@ -213,7 +210,7 @@ def fetch_loader_book_wiki(model_names, args):
         )
     else:
         dataset_bookcorpus = load_dataset("bookcorpus")
-        dataset_wiki = load_dataset("wikitext", "wikitext-103-v1")
+        dataset_wiki = load_dataset("wikitext", "wikitext-2-v1")
         train_encoding_list = []
         valid_encoding_list = []
         test_encoding_list = []
@@ -253,7 +250,7 @@ def fetch_loader_book_wiki(model_names, args):
     data_train = SSTDatasetMulti(train_encoding_list, model_names)
     data_valid = SSTDatasetMulti(valid_encoding_list, model_names)
     data_test = SSTDatasetMulti(test_encoding_list, model_names)
-    print(len(data_train))
+    # print(len(data_train))
     loader_train = torch.utils.data.DataLoader(
         data_train, batch_size=args.train_batch_size, collate_fn=custom_collate_SST
     )
@@ -267,8 +264,6 @@ def fetch_loader_book_wiki(model_names, args):
 
 
 def fetch_loaders2(model_names, args):
-    from datasets import load_dataset
-
     wnut = load_dataset("wnut_17")
     data_loader = wnut_multiple_granularity(wnut, args)
     # model_main = data_loader.model_dict
@@ -320,3 +315,49 @@ def fetch_loaders2(model_names, args):
         data_test, batch_size=args.test_batch_size, collate_fn=custom_collate
     )
     return loader_train, loader_valid, loader_test
+
+
+def fetch_loader_book_wiki_bimodal(model_names, args):
+    """
+    To load dataset from bookcorpus and wikitext:
+    - Wikitext: ['wikitext-103-v1', 'wikitext-2-v1', 'wikitext-103-raw-v1', 'wikitext-2-raw-v1']; 
+    - WikiText-2 aims to be of a similar size to the PTB while WikiText-103 contains all articles extracted from Wikipedia. 
+    """
+
+    """
+    Store dataset in local to save time, 
+    if detected dataset is already downloaded, load from the disk
+    """
+    if os.path.isfile("data/train_encoding_book_wiki.pickle"):
+        with open("train_encoding_book_wiki.pickle", "rb") as handle:
+            train_encoding_list = pickle.load(handle)
+        print(
+            "=================== Data Loaded from Local Data Folder ==================="
+        )
+    else:
+        dataset_bookcorpus = load_dataset("bookcorpus")
+        dataset_wiki = load_dataset("wikitext", "wikitext-2-v1")
+
+        train_encoding_list = []
+        for model_name in model_names:
+            tokenizer = AutoTokenizer.from_pretrained(
+                model_name, add_prefix_space=True
+            )  ## changed here
+            xlm_train_encoding = tokenizer(
+                dataset_bookcorpus["train"]["text"] + dataset_wiki["train"]["text"],
+                padding="longest",
+                truncation=True,
+            )
+
+            train_encoding_list.append(xlm_train_encoding)
+        # store dataset
+        with open("train_encoding_book_wiki.pickle", "wb") as handle:
+            pickle.dump(xlm_train_encoding, handle, protocol=pickle.HIGHEST_PROTOCOL)
+       
+        print("=================== Data Loaded from HuggingFace ===================")
+
+    data_train = BookWikiDatasetMulti(train_encoding_list, model_names)
+    loader_train = torch.utils.data.DataLoader(
+        data_train, batch_size=args.train_batch_size, collate_fn=custom_collate_SST
+    )
+    return loader_train, None, None

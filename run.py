@@ -105,6 +105,8 @@ if __name__ == '__main__':
         train_MLM(args)
     elif args.expr == "mlm_c": 
         train_MLM_corpus(args)
+    elif args.expr == 'mlm_b':
+        train_bimodal_MLM(args)
     else:
         train(args)
 
