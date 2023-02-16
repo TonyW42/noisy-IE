@@ -15,6 +15,7 @@ from utils.fetch_loader import (
     fetch_loaders2,
     fetch_loaders_SST,
     fetch_loader_book_wiki,
+    fetch_loader_book_wiki_bimodal,
 )
 import pickle
 import time

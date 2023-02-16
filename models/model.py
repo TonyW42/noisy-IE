@@ -1342,6 +1342,7 @@ class BertLayer_bimodal(nn.Module):
 
 class co_attention(nn.Module):
     def __init__(self, emb_size):
+        super().__init__()
         self.emb_size = emb_size
         self.cotrm = BertLayer_bimodal(emb_size=emb_size)
         self.trm = BertLayer_bimodal(emb_size=emb_size)
@@ -1354,6 +1355,7 @@ class co_attention(nn.Module):
 
 class bimodal_base(nn.Module):
     def __init__(self, model_dict, args):
+        super().__init__()
         self.model_dict = model_dict
         self.args = args
         self.char_co_attention = nn.ModuleList(
@@ -1386,7 +1388,9 @@ class bimodal_base(nn.Module):
 
 class bimodal_pretrain(nn.Module):
     def __init__(self, base, args):
-        args.char_vocab_size = base.model_dict["char"].config.vocab_size
+        super().__init__()
+        args.char_vocab_size = 1114112
+        # args.char_vocab_size = base.model_dict["char"].config.vocab_size
         args.word_vocab_size = base.model_dict["word"].config.vocab_size
         self.base = base
         self.char_mlm_layer = nn.Linear(args.emb_size, args.char_vocab_size)
