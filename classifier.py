@@ -382,7 +382,7 @@ def train_sequential_2(args):
 
 
 
-def train_bimodal_MLM(args):
+def train_bimodal_MLM(args, test=False):
     ## initialize model
     model_dict = torch.nn.ModuleDict()
     model_dict["char"] =  AutoModel.from_pretrained(args.char_model)
@@ -408,7 +408,7 @@ def train_bimodal_MLM(args):
 
     ## TODO: get loaders 
     model_names = args.model_list.split("|")
-    trainloader, devloader, testloader = fetch_loader_book_wiki_bimodal(model_names, args)
+    trainloader, devloader, testloader = fetch_loader_book_wiki_bimodal(model_names, args, test=test)
     ## NOTE: structure of data 
     ## data : {"char":  char_data, "word": word_data}
     ## char_data: what returned by char tokenizer + word_id_for_char

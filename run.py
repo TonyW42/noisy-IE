@@ -69,6 +69,7 @@ if __name__ == '__main__':
                                 "subword_50k": "roberta-base",
                                 "subword_30k" : "bert-base-cased"})
 
+    parser.add_argument('--test', type=bool, default=False)
     parser.add_argument('--embed_size_dict', type=dict, 
                         default= {"google/canine-s": 768,
                                   "google/canine-c": 768,
@@ -106,7 +107,7 @@ if __name__ == '__main__':
     elif args.expr == "mlm_c": 
         train_MLM_corpus(args)
     elif args.expr == 'mlm_b':
-        train_bimodal_MLM(args)
+        train_bimodal_MLM(args, args.test)
     else:
         train(args)
 

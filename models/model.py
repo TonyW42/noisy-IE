@@ -104,19 +104,12 @@ class BookWikiDatasetMulti(torch.utils.data.Dataset):
         self.model_names = model_names
 
     def __getitem__(self, idx):
-        result = {}
-        for encoding, model_name in zip(self.encodings, self.model_names):
-            item = {key: torch.tensor(val[idx]) for key, val in encoding.items()}
-            item["labels"] = item["input_ids"]
-            if 'canine' in model_name:
-                result['char'] = item
-            else:
-                result['word'] = item
-            # result[model_name] = item
-        return result
+        # item = {key: {'input_ids': torch.tensor(val['input_ids']), 'attention_mask': torch.tensor(val['attention_mask'])} for key, val in self.encodings[idx].items()}
+        return self.encodings[idx]
 
     def __len__(self):
-        return len(self.encodings[0]["input_ids"])  ## TODO HERE!
+        print(self.encodings[0].keys())
+        return len(self.encodings)  ## TODO HERE!
 
 
 ## need dataset/loader structure such as the following:
@@ -1368,6 +1361,9 @@ class bimodal_base(nn.Module):
     def forward(self, data):
         char_data = data["char"]
         word_data = data["word"]
+        print('=======here=======')
+        print(data)
+        print(char_data)
         char_encoded = self.model_dict["char"](
             input_ids=char_data["input_ids"].to(self.args.device),
             attention_mask=char_data["input_ids"].to(self.args.device),
