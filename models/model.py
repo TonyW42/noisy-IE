@@ -97,6 +97,28 @@ class SSTDatasetMulti(torch.utils.data.Dataset):
         return len(self.encodings[0]["input_ids"])  ## TODO HERE!
 
 
+class BookWikiDatasetMulti(torch.utils.data.Dataset):
+    def __init__(self, encodings, model_names):
+        # inputs are as Lists of encodings, labels, and models names : []
+        self.encodings = encodings
+        self.model_names = model_names
+
+    def __getitem__(self, idx):
+        result = {}
+        for encoding, model_name in zip(self.encodings, self.model_names):
+            item = {key: torch.tensor(val[idx]) for key, val in encoding.items()}
+            item["labels"] = item["input_ids"]
+            if 'canine' in model_name:
+                result['char'] = item
+            else:
+                result['word'] = item
+            # result[model_name] = item
+        return result
+
+    def __len__(self):
+        return len(self.encodings[0]["input_ids"])  ## TODO HERE!
+
+
 ## need dataset/loader structure such as the following:
 ## integrate to data.py if possible
 class wnut_multiple_granularity(Dataset):
@@ -1476,7 +1498,7 @@ if __name__ == "__main__":
     parser.add_argument("--num_labels", type=int, default=13)
     parser.add_argument(
         "--granularities", type=str, default="character,subword_50k"
-    )  # add cahracter
+    )  # add character
     parser.add_argument("--add_space_for_char", type=bool, default=True)
     parser.add_argument("--to_char_method", type=str, default="inherit")
     parser.add_argument("--train", type=str, default="True")
