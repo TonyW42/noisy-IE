@@ -394,3 +394,55 @@ def fetch_loader_book_wiki_bimodal(model_names, args, test):
         data_train, batch_size=args.train_batch_size, collate_fn=custom_collate_SST
     )
     return loader_train, None, None
+
+
+def tokenize_bimodal(text, char_tokenizer, word_tokenizer):
+    '''
+    input: 
+        text: input text
+        char_tokenizer: character tokenizer
+        word_tokenizer: word tokenizer
+    output:
+        result : dict {"word" : word_tokenized, 
+                       "char" : char_tokenized,
+                       "char_ids" :  the #word the character belongs to. Same length as character input_ids
+                       }
+    '''
+    ## NOTE: change padding type and custom collator 
+    char_tokenized = char_tokenizer(text, padding = True, truncation = True)
+    word_tokenized = word_tokenizer(text, padding = True, truncation = True)
+    char_ids = [] ## NOTE: should we match CLS tokens to each? 
+
+    char_list = char_tokenizer.tokenize(text)
+    word_list = word_tokenizer.tokenize(text)
+
+    current_word_id = 0
+    for word in word_list:
+        char_ids.extend([current_word_id for i in range(len(word))])
+        current_word_id += 1
+    char_ids.insert(0, -100)
+    char_ids.append(-100) ## [CLS] and [SEP] token should not be aligned
+
+    return {
+        "char" : char_tokenized,
+        "word" : word_tokenized,
+        "char_ids" : char_ids
+    }
+
+
+
+
+        
+
+
+
+
+    
+
+
+
+
+
+
+
+
