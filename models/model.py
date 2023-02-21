@@ -105,14 +105,18 @@ class BookWikiDatasetMulti(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         result = {}
-        item = {key: torch.tensor(val[idx]) for key, val in self.encodings['char'].items()}
-        result['char'] = item
-        item = {key: torch.tensor(val[idx]) for key, val in self.encodings['word'].items()}
-        result['word'] = item
+        item = {
+            key: torch.tensor(val[idx]) for key, val in self.encodings["char"].items()
+        }
+        result["char"] = item
+        item = {
+            key: torch.tensor(val[idx]) for key, val in self.encodings["word"].items()
+        }
+        result["word"] = item
         return result
 
     def __len__(self):
-        return len(self.encodings['word']['input_ids'])  ## TODO HERE!
+        return len(self.encodings["word"]["input_ids"])  ## TODO HERE!
 
 
 ## need dataset/loader structure such as the following:
@@ -1393,20 +1397,18 @@ class bimodal_pretrain(nn.Module):
         self.word_mlm_layer = nn.Linear(args.emb_size, args.word_vocab_size)
         self.logit_scale = nn.Parameter(torch.ones([]) * np.log(1 / 0.07))
 
-    
     def forward(self, data):
-        encoded = self.base(data = data)
+        encoded = self.base(data=data)
         char_mlm_logits = self.char_mlm_layer(encoded["word"])
         word_mlm_logits = self.word_mlm_layer(encoded["word"])
-        ## TODO: check correctness 
-        ## TODO: check whether word/char is aligned. 
+        ## TODO: check correctness
+        ## TODO: check whether word/char is aligned.
         similarity = torch.matmul(encoded["word"], encoded["char"]) / self.logit_scale
         return {
-            "char": char_mlm_logits, 
-            "word": word_mlm_logits, 
-            "similarity": similarity 
+            "char": char_mlm_logits,
+            "word": word_mlm_logits,
+            "similarity": similarity,
         }
-
 
 
 class bimodal_trainer(BaseEstimator):
@@ -1417,35 +1419,34 @@ class bimodal_trainer(BaseEstimator):
         char_mlm_loss = self.criterion(logits_dict["char"], data["char"]["input_ids"])
         word_mlm_loss = self.criterion(logits_dict["word"], data["word"]["input_ids"])
         ## TODO: check dimension here
-        alignment_loss = self.criterion(logits_dict["similarity"], data["char_word_ids"])
+        alignment_loss = self.criterion(
+            logits_dict["similarity"], data["char_word_ids"]
+        )
         ## TODO: weight loss
-        loss = char_mlm_loss + word_mlm_loss  + alignment_loss
+        loss = char_mlm_loss + word_mlm_loss + alignment_loss
         if self.mode == "train":
             loss.backward()
             self.optimizer.step()
             if self.scheduler is not None:
                 self.scheduler.step()
-            
+
             self.optimizer.zero_grad()
         elif self.mode in ("dev", "test"):
             pass
         for key, val in logits_dict.items():
             logits_dict[key] = val.detach().cpu()
         return {
-                    "loss": loss.detach().cpu().item(),
-                    "char_mlm_loss": char_mlm_loss.detach().cpu().item(),
-                    "word_mlm_loss": word_mlm_loss.detach().cpu().item(),
-                    "alignment_loss": alignment_loss.detach().cpu().item(),
-                    "logits_dict": logits_dict
-                }
-            
+            "loss": loss.detach().cpu().item(),
+            "char_mlm_loss": char_mlm_loss.detach().cpu().item(),
+            "word_mlm_loss": word_mlm_loss.detach().cpu().item(),
+            "alignment_loss": alignment_loss.detach().cpu().item(),
+            "logits_dict": logits_dict,
+        }
 
     def _eval(self, evalloader):
         self.model.eval()
         tbar = tqdm(evalloader, dynamic_ncols=True)
-        loss, char_mlm_loss, word_mlm_loss, alignment_loss = [], [], [],[]
-        
-
+        loss, char_mlm_loss, word_mlm_loss, alignment_loss = [], [], [], []
 
         if self.evaluate_metric is None:
             self.evaluate_metric = dict()
@@ -1467,18 +1468,11 @@ class bimodal_trainer(BaseEstimator):
         print(f"mean_word_mlm_loss: {mean_word_mlm_loss}")
         print(f"mean_alignment_loss: {mean_alignment_loss}")
         return {
-            "mean loss": mean_loss, 
+            "mean loss": mean_loss,
             "mean_char_mlm_loss": mean_char_mlm_loss,
-            "mean_word_mlm_loss": mean_word_mlm_loss, 
-            "mean_alignment_loss" : mean_alignment_loss
+            "mean_word_mlm_loss": mean_word_mlm_loss,
+            "mean_alignment_loss": mean_alignment_loss,
         }
-
-        
-        
-            
-
-
-
 
 
 if __name__ == "__main__":

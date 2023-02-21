@@ -115,16 +115,10 @@ def train_MLM(args):
         num_warmup_steps=0,
         num_training_steps=num_training_steps,
     )
-<<<<<<< Updated upstream
     logger = None  ## TODO: add logger to track progress
 
     train_epochs = args.n_epochs
     args.n_epochs = args.mlm_epochs
-=======
-    logger = None ## TODO: add logger to track progress
-
-    args.n_epochs = 10
->>>>>>> Stashed changes
     MLM_classifier_ = MLM_classifier(
         model=MLM_model,
         cfg=args,
@@ -150,7 +144,6 @@ def train_MLM(args):
         num_warmup_steps=0,
         num_training_steps=num_training_steps,
     )
-<<<<<<< Updated upstream
     logger = None  ## TODO: add logger to track progress
 
     args.n_epochs = train_epochs
@@ -162,18 +155,6 @@ def train_MLM(args):
         scheduler=scheduler,
         device=args.device,
         logger=logger,
-=======
-    logger = None ## TODO: add logger to track progress
-    args.n_epochs = 100
-    classifier = MLM_classifier_(
-        model = model, 
-        cfg = args,
-        criterion = criterion, 
-        optimizer = optimizer, 
-        scheduler = scheduler, 
-        device = args.device,
-        logger = logger 
->>>>>>> Stashed changes
     )
     if args.mode == "train":
         classifier.train(args, trainloader, testloader)
@@ -401,12 +382,11 @@ def train_sequential_2(args):
     ## need to re-write the _eval() function for token classification.
 
 
-
 def train_bimodal_MLM(args, test=False):
     ## initialize model
     model_dict = torch.nn.ModuleDict()
-    model_dict["char"] =  AutoModel.from_pretrained(args.char_model)
-    model_dict["word"] =  AutoModel.from_pretrained(args.word_model)
+    model_dict["char"] = AutoModel.from_pretrained(args.char_model)
+    model_dict["word"] = AutoModel.from_pretrained(args.word_model)
 
     base = bimodal_base(model_dict=model_dict, args=args).to(args.device)
     MLM_model = bimodal_pretrain(base=base, args=args).to(args.device)
@@ -426,10 +406,12 @@ def train_bimodal_MLM(args, test=False):
         MLM_model.parameters(), lr=args.lr, weight_decay=args.weight_decay
     )
 
-    ## TODO: get loaders 
+    ## TODO: get loaders
     model_names = args.model_list.split("|")
-    trainloader, devloader, testloader = fetch_loader_book_wiki_bimodal(model_names, args, test=test)
-    ## NOTE: structure of data 
+    trainloader, devloader, testloader = fetch_loader_book_wiki_bimodal(
+        model_names, args, test=test
+    )
+    ## NOTE: structure of data
     ## data : {"char":  char_data, "word": word_data}
     ## char_data: what returned by char tokenizer + word_id_for_char
     ## word_data: what returned by word tokenizer
