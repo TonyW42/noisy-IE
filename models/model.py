@@ -100,16 +100,19 @@ class SSTDatasetMulti(torch.utils.data.Dataset):
 class BookWikiDatasetMulti(torch.utils.data.Dataset):
     def __init__(self, encodings, model_names):
         # inputs are as Lists of encodings, labels, and models names : []
-        self.encodings = encodings
+        self.encodings = encodings[0]
         self.model_names = model_names
 
     def __getitem__(self, idx):
-        # item = {key: {'input_ids': torch.tensor(val['input_ids']), 'attention_mask': torch.tensor(val['attention_mask'])} for key, val in self.encodings[idx].items()}
-        return self.encodings[idx]
+        result = {}
+        item = {key: torch.tensor(val[idx]) for key, val in self.encodings['char'].items()}
+        result['char'] = item
+        item = {key: torch.tensor(val[idx]) for key, val in self.encodings['word'].items()}
+        result['word'] = item
+        return result
 
     def __len__(self):
-        print(self.encodings[0].keys())
-        return len(self.encodings)  ## TODO HERE!
+        return len(self.encodings['word']['input_ids'])  ## TODO HERE!
 
 
 ## need dataset/loader structure such as the following:
@@ -1361,9 +1364,6 @@ class bimodal_base(nn.Module):
     def forward(self, data):
         char_data = data["char"]
         word_data = data["word"]
-        print('=======here=======')
-        print(data)
-        print(char_data)
         char_encoded = self.model_dict["char"](
             input_ids=char_data["input_ids"].to(self.args.device),
             attention_mask=char_data["input_ids"].to(self.args.device),

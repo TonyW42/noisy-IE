@@ -357,28 +357,29 @@ def fetch_loader_book_wiki_bimodal(model_names, args, test):
         dataset_wiki = load_dataset("wikitext", "wikitext-2-v1")
 
         train_encoding_list = []
-        for model_name in model_names:
-            if 'canine' not in model_name:
-                tokenizer = AutoTokenizer.from_pretrained(
-                    model_name, add_prefix_space=True, cache_dir=args.output_dir
-                )  ## changed here
-                if test:
-                    xlm_train_encoding = tokenizer(
-                        dataset_bookcorpus["train"]["text"][:10],
-                        padding="longest",
-                        truncation=True,
-                    )
-                else:
-                    xlm_train_encoding = tokenizer(
-                        dataset_bookcorpus["train"]["text"] + dataset_wiki["train"]["text"],
-                        padding="longest",
-                        truncation=True,
-                    )
 
-            train_encoding_list.append({
-                'word': xlm_train_encoding,
-                'char': convert_char(xlm_train_encoding)
-            })
+        model_name = model_names[0] if 'canine' not in model_names[0] else model_names[1]
+        
+        tokenizer = AutoTokenizer.from_pretrained(
+            model_name, add_prefix_space=True, cache_dir=args.output_dir
+        )  ## changed here
+        if test:
+            xlm_train_encoding = tokenizer(
+                dataset_bookcorpus["train"]["text"][:10],
+                padding="longest",
+                truncation=True,
+            )
+        else:
+            xlm_train_encoding = tokenizer(
+                dataset_bookcorpus["train"]["text"] + dataset_wiki["train"]["text"],
+                padding="longest",
+                truncation=True,
+            )
+
+        train_encoding_list.append({
+            'word': xlm_train_encoding,
+            'char': convert_char(xlm_train_encoding)
+        })
         # store dataset
         with open("data/train_encoding_book_wiki.pickle", "wb") as handle:
             pickle.dump(train_encoding_list, handle, protocol=pickle.HIGHEST_PROTOCOL)

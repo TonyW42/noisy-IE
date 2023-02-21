@@ -95,6 +95,8 @@ if __name__ == '__main__':
 
     setup_seed(args.seed)
 
+    # args.k = 2
+
 
     # model = HuggingFaceModel(args)
     # model.train()

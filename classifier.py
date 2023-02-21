@@ -10,6 +10,7 @@ from transformers import (
     AutoModelForMaskedLM,
 )
 import torch
+from models.model import bimodal_trainer
 from utils.fetch_loader import (
     fetch_loaders,
     fetch_loaders2,
