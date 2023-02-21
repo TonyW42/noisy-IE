@@ -317,7 +317,7 @@ def fetch_loaders2(model_names, args):
     return loader_train, loader_valid, loader_test
 
 
-def fetch_loader_book_wiki_bimodal(model_names, args):
+def fetch_loader_book_wiki_bimodal(model_names, args, test):
     """
     To load dataset from bookcorpus and wikitext:
     - Wikitext: ['wikitext-103-v1', 'wikitext-2-v1', 'wikitext-103-raw-v1', 'wikitext-2-raw-v1']; 
@@ -328,8 +328,28 @@ def fetch_loader_book_wiki_bimodal(model_names, args):
     Store dataset in local to save time, 
     if detected dataset is already downloaded, load from the disk
     """
+
+    def convert_char(xlm_train_encoding):
+        encoded = defaultdict(list)
+        for input_id, att_mask in zip(
+            xlm_train_encoding["input_ids"], xlm_train_encoding["attention_mask"]
+        ):
+            each_i, each_a = [], []
+            for each_input_id, each_att_mask in zip(input_id, att_mask):
+                if each_input_id not in range(0, 4):
+                    original_word = tokenizer.decode([each_input_id]).strip()
+                    length = len(original_word)
+                else:
+                    length = 1
+                each_i.append(each_input_id * length)
+                each_a.append(each_att_mask * length)
+
+            encoded["input_ids"].append(each_i)
+            encoded["attention_mask"].append(each_a)
+        return encoded
+
     if os.path.isfile("data/train_encoding_book_wiki.pickle"):
-        with open("train_encoding_book_wiki.pickle", "rb") as handle:
+        with open("data/train_encoding_book_wiki.pickle", "rb") as handle:
             train_encoding_list = pickle.load(handle)
         print(
             "=================== Data Loaded from Local Data Folder ==================="
@@ -339,21 +359,34 @@ def fetch_loader_book_wiki_bimodal(model_names, args):
         dataset_wiki = load_dataset("wikitext", "wikitext-2-v1")
 
         train_encoding_list = []
-        for model_name in model_names:
-            tokenizer = AutoTokenizer.from_pretrained(
-                model_name, add_prefix_space=True
-            )  ## changed here
+
+        model_name = (
+            model_names[0] if "canine" not in model_names[0] else model_names[1]
+        )
+
+        tokenizer = AutoTokenizer.from_pretrained(
+            model_name, add_prefix_space=True, cache_dir=args.output_dir
+        )  ## changed here
+        if test:
+            xlm_train_encoding = tokenizer(
+                dataset_bookcorpus["train"]["text"][:10],
+                padding="longest",
+                truncation=True,
+            )
+        else:
             xlm_train_encoding = tokenizer(
                 dataset_bookcorpus["train"]["text"] + dataset_wiki["train"]["text"],
                 padding="longest",
                 truncation=True,
             )
 
-            train_encoding_list.append(xlm_train_encoding)
+        train_encoding_list.append(
+            {"word": xlm_train_encoding, "char": convert_char(xlm_train_encoding)}
+        )
         # store dataset
-        with open("train_encoding_book_wiki.pickle", "wb") as handle:
-            pickle.dump(xlm_train_encoding, handle, protocol=pickle.HIGHEST_PROTOCOL)
-       
+        with open("data/train_encoding_book_wiki.pickle", "wb") as handle:
+            pickle.dump(train_encoding_list, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
         print("=================== Data Loaded from HuggingFace ===================")
 
     data_train = BookWikiDatasetMulti(train_encoding_list, model_names)

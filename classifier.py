@@ -10,6 +10,7 @@ from transformers import (
     AutoModelForMaskedLM,
 )
 import torch
+from models.model import bimodal_trainer
 from utils.fetch_loader import (
     fetch_loaders,
     fetch_loaders2,
@@ -381,12 +382,11 @@ def train_sequential_2(args):
     ## need to re-write the _eval() function for token classification.
 
 
-
-def train_bimodal_MLM(args):
+def train_bimodal_MLM(args, test=False):
     ## initialize model
     model_dict = torch.nn.ModuleDict()
-    model_dict["char"] =  AutoModel.from_pretrained(args.char_model)
-    model_dict["word"] =  AutoModel.from_pretrained(args.word_model)
+    model_dict["char"] = AutoModel.from_pretrained(args.char_model)
+    model_dict["word"] = AutoModel.from_pretrained(args.word_model)
 
     base = bimodal_base(model_dict=model_dict, args=args).to(args.device)
     MLM_model = bimodal_pretrain(base=base, args=args).to(args.device)
@@ -406,10 +406,12 @@ def train_bimodal_MLM(args):
         MLM_model.parameters(), lr=args.lr, weight_decay=args.weight_decay
     )
 
-    ## TODO: get loaders 
+    ## TODO: get loaders
     model_names = args.model_list.split("|")
-    trainloader, devloader, testloader = fetch_loader_book_wiki_bimodal(model_names, args)
-    ## NOTE: structure of data 
+    trainloader, devloader, testloader = fetch_loader_book_wiki_bimodal(
+        model_names, args, test=test
+    )
+    ## NOTE: structure of data
     ## data : {"char":  char_data, "word": word_data}
     ## char_data: what returned by char tokenizer + word_id_for_char
     ## word_data: what returned by word tokenizer
