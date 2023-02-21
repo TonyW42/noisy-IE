@@ -1403,7 +1403,7 @@ class bimodal_pretrain(nn.Module):
         word_mlm_logits = self.word_mlm_layer(encoded["word"])
         ## TODO: check correctness
         ## TODO: check whether word/char is aligned.
-        similarity = torch.matmul(encoded["word"], encoded["char"]) / self.logit_scale
+        similarity = torch.matmul(encoded["word"], torch.transpose(encoded["char"], 1, 2)) / self.logit_scale
         return {
             "char": char_mlm_logits,
             "word": word_mlm_logits,
