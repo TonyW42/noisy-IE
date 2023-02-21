@@ -115,10 +115,16 @@ def train_MLM(args):
         num_warmup_steps=0,
         num_training_steps=num_training_steps,
     )
+<<<<<<< Updated upstream
     logger = None  ## TODO: add logger to track progress
 
     train_epochs = args.n_epochs
     args.n_epochs = args.mlm_epochs
+=======
+    logger = None ## TODO: add logger to track progress
+
+    args.n_epochs = 10
+>>>>>>> Stashed changes
     MLM_classifier_ = MLM_classifier(
         model=MLM_model,
         cfg=args,
@@ -144,6 +150,7 @@ def train_MLM(args):
         num_warmup_steps=0,
         num_training_steps=num_training_steps,
     )
+<<<<<<< Updated upstream
     logger = None  ## TODO: add logger to track progress
 
     args.n_epochs = train_epochs
@@ -155,6 +162,18 @@ def train_MLM(args):
         scheduler=scheduler,
         device=args.device,
         logger=logger,
+=======
+    logger = None ## TODO: add logger to track progress
+    args.n_epochs = 100
+    classifier = MLM_classifier_(
+        model = model, 
+        cfg = args,
+        criterion = criterion, 
+        optimizer = optimizer, 
+        scheduler = scheduler, 
+        device = args.device,
+        logger = logger 
+>>>>>>> Stashed changes
     )
     if args.mode == "train":
         classifier.train(args, trainloader, testloader)
