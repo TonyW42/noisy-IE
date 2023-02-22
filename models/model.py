@@ -100,23 +100,28 @@ class SSTDatasetMulti(torch.utils.data.Dataset):
 class BookWikiDatasetMulti(torch.utils.data.Dataset):
     def __init__(self, encodings, model_names):
         # inputs are as Lists of encodings, labels, and models names : []
-        self.encodings = encodings[0]
+        self.encodings = encodings
         self.model_names = model_names
 
     def __getitem__(self, idx):
-        result = {}
-        item = {
-            key: torch.tensor(val[idx]) for key, val in self.encodings["char"].items()
+        # result = {}
+        # item = {
+        #     key: torch.tensor(val[idx]) for key, val in self.encodings["char"].items()
+        # }
+        # result["char"] = item
+        # item = {
+        #     key: torch.tensor(val[idx]) for key, val in self.encodings["word"].items()
+        # }
+        # result["word"] = item
+
+        """{
+            'char':  {'input_ids': [bs, seq_len, emb_size], 'att_mask': [bs, seq_len, emb_size]}
         }
-        result["char"] = item
-        item = {
-            key: torch.tensor(val[idx]) for key, val in self.encodings["word"].items()
-        }
-        result["word"] = item
-        return result
+        """
+        return self.encodings[idx]
 
     def __len__(self):
-        return len(self.encodings["word"]["input_ids"])  ## TODO HERE!
+        return len(self.encodings)
 
 
 ## need dataset/loader structure such as the following:
@@ -141,12 +146,14 @@ class wnut_multiple_granularity(Dataset):
         for name in self.args.model_names:
             print(f"============== loading {name} ==============")
             tokenizer_dict[name] = AutoTokenizer.from_pretrained(
-                name, add_prefix_space=self.args.prefix_space
+                name,
+                add_prefix_space=self.args.prefix_space,
+                cache_dir=self.args.output_dir,
             )
             self.model_dict[
                 name
             ] = transformers.AutoModelForTokenClassification.from_pretrained(
-                name, num_labels=self.args.num_labels
+                name, num_labels=self.args.num_labels, cache_dir=self.args.output_dir
             )
         self.tokenizer_dict = tokenizer_dict
 
@@ -849,7 +856,9 @@ class flat_MLM_w_base(nn.Module):
 class baseline_model(nn.Module):
     def __init__(self, args):
         super().__init__()
-        self.backbone = AutoModel.from_pretrained(args.word_model)
+        self.backbone = AutoModel.from_pretrained(
+            args.word_model, cache_dir=args.output_dir
+        )
         self.lin = nn.Linear(768, args.num_labels)
         self.args = args
 
@@ -1187,7 +1196,7 @@ class JSD(nn.Module):
 class base_model(nn.Module):
     def __init__(self, name, args):
         super().__init__()
-        self.backbone = AutoModel.from_pretrained(name)
+        self.backbone = AutoModel.from_pretrained(name, cache_dir=args.output_dir)
         self.lin = nn.Linear(self.backbone.config.hidden_size, args.num_labels)
         self.args = args
 
@@ -1403,7 +1412,10 @@ class bimodal_pretrain(nn.Module):
         word_mlm_logits = self.word_mlm_layer(encoded["word"])
         ## TODO: check correctness
         ## TODO: check whether word/char is aligned.
-        similarity = torch.matmul(encoded["word"], torch.transpose(encoded["char"], 1, 2)) / self.logit_scale
+        similarity = (
+            torch.matmul(encoded["word"], torch.transpose(encoded["char"], 1, 2))
+            / self.logit_scale
+        )
         return {
             "char": char_mlm_logits,
             "word": word_mlm_logits,
@@ -1417,11 +1429,24 @@ class bimodal_trainer(BaseEstimator):
         logits_dict = self.model(data=data)
         ## TODO: check data structure
         print(logits_dict["char"].shape, data["char"]["input_ids"].shape)
-        char_mlm_loss = self.criterion(torch.reshape(logits_dict["char"], shape = (-1, logits_dict["char"].shape[-1])), data["char"]["input_ids"].view(-1)) # [10 * 44 * vocab_size] -> [(10*44) * vocab_size]
-        word_mlm_loss = self.criterion(torch.reshape(logits_dict["word"], shape = (-1, logits_dict["word"].shape[-1])), data["word"]["input_ids"].view(-1))
+        char_mlm_loss = self.criterion(
+            torch.reshape(
+                logits_dict["char"], shape=(-1, logits_dict["char"].shape[-1])
+            ),
+            data["char"]["input_ids"].view(-1),
+        )  # [10 * 44 * vocab_size] -> [(10*44) * vocab_size]
+        word_mlm_loss = self.criterion(
+            torch.reshape(
+                logits_dict["word"], shape=(-1, logits_dict["word"].shape[-1])
+            ),
+            data["word"]["input_ids"].view(-1),
+        )
         ## TODO: check dimension here
         alignment_loss = self.criterion(
-            logits_dict["similarity"], data["char_word_ids"]
+            logits_dict["similarity"],
+            data[
+                "char_word_ids"
+            ],  # sim: [bs * word_seq_len * char_seq_len] id:[bs, char_seq_len]
         )
         ## TODO: weight loss
         loss = char_mlm_loss + word_mlm_loss + alignment_loss

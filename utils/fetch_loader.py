@@ -93,6 +93,35 @@ def custom_collate_SST(data, seq_len=512, probability=0.15):  # (2)
     return return_dict
 
 
+def custom_collate_book_wiki(data, seq_len=44, probability=0.15):
+    ### TODO: random mask by probability given
+    model_names = ["word", "char"]
+    batch_size = len(data)
+
+    return_dict = defaultdict(defaultdict)
+
+    for m_name in model_names:
+        input_ids = []
+        attention_mask = []
+        char_word_id = []
+        for i in range(batch_size):
+            input_ids.append(torch.tensor(data[i][m_name]["input_ids"][:seq_len]))
+            attention_mask.append(
+                torch.tensor(data[i][m_name]["attention_mask"][:seq_len])
+            )
+            char_word_id.append(torch.tensor(data[i]["char_word_ids"][:seq_len]))
+
+        input_ids = pad_sequence(input_ids, batch_first=True, padding_value=1)
+        attention_mask = pad_sequence(attention_mask, batch_first=True, padding_value=0)
+        char_word_id = pad_sequence(char_word_id, batch_first=True, padding_value=-100)
+        return_dict[m_name]["input_ids"] = input_ids
+        # return_dict[m_name]['label'] = input_ids
+        return_dict[m_name]["attention_mask"] = attention_mask
+        return_dict["char_word_ids"] = char_word_id.clone().detach()
+
+    return return_dict
+
+
 def fetch_loaders(model_names, args):
     wnut = load_dataset("wnut_17")
     train_encoding_list, train_label_list = [], []
@@ -100,7 +129,7 @@ def fetch_loaders(model_names, args):
     test_encoding_list, test_label_list = [], []
     for model_name in model_names:
         tokenizer = AutoTokenizer.from_pretrained(
-            model_name, add_prefix_space=True
+            model_name, add_prefix_space=True, cache_dir=args.output_dir
         )  ## changed here
         xlm_train_encoding = tokenizer(
             wnut["train"]["tokens"],
@@ -155,7 +184,7 @@ def fetch_loaders_SST(model_names, args):
     test_encoding_list = []
     for model_name in model_names:
         tokenizer = AutoTokenizer.from_pretrained(
-            model_name, add_prefix_space=True
+            model_name, add_prefix_space=True, cache_dir=args.output_dir
         )  ## changed here
         xlm_train_encoding = tokenizer(
             sst["train"]["sentence"], padding="longest", truncation=True
@@ -216,7 +245,7 @@ def fetch_loader_book_wiki(model_names, args):
         test_encoding_list = []
         for model_name in model_names:
             tokenizer = AutoTokenizer.from_pretrained(
-                model_name, add_prefix_space=True
+                model_name, add_prefix_space=True, cache_dir=args.output_dir
             )  ## changed here
             xlm_train_encoding = tokenizer(
                 dataset_bookcorpus["train"]["text"] + dataset_wiki["train"]["text"],
@@ -328,26 +357,6 @@ def fetch_loader_book_wiki_bimodal(model_names, args, test):
     Store dataset in local to save time, 
     if detected dataset is already downloaded, load from the disk
     """
-
-    def convert_char(xlm_train_encoding):
-        encoded = defaultdict(list)
-        for input_id, att_mask in zip(
-            xlm_train_encoding["input_ids"], xlm_train_encoding["attention_mask"]
-        ):
-            each_i, each_a = [], []
-            for each_input_id, each_att_mask in zip(input_id, att_mask):
-                if each_input_id not in range(0, 4):
-                    original_word = tokenizer.decode([each_input_id]).strip()
-                    length = len(original_word)
-                else:
-                    length = 1
-                each_i.append(each_input_id * length)
-                each_a.append(each_att_mask * length)
-
-            encoded["input_ids"].append(each_i)
-            encoded["attention_mask"].append(each_a)
-        return encoded
-
     if os.path.isfile("data/train_encoding_book_wiki.pickle"):
         with open("data/train_encoding_book_wiki.pickle", "rb") as handle:
             train_encoding_list = pickle.load(handle)
@@ -360,29 +369,25 @@ def fetch_loader_book_wiki_bimodal(model_names, args, test):
 
         train_encoding_list = []
 
-        model_name = (
-            model_names[0] if "canine" not in model_names[0] else model_names[1]
-        )
-
-        tokenizer = AutoTokenizer.from_pretrained(
-            model_name, add_prefix_space=True, cache_dir=args.output_dir
+        word_tokenizer = AutoTokenizer.from_pretrained(
+            args.word_model, add_prefix_space=True, cache_dir=args.output_dir
         )  ## changed here
-        if test:
-            xlm_train_encoding = tokenizer(
-                dataset_bookcorpus["train"]["text"][:10],
-                padding="longest",
-                truncation=True,
-            )
-        else:
-            xlm_train_encoding = tokenizer(
-                dataset_bookcorpus["train"]["text"] + dataset_wiki["train"]["text"],
-                padding="longest",
-                truncation=True,
-            )
-
-        train_encoding_list.append(
-            {"word": xlm_train_encoding, "char": convert_char(xlm_train_encoding)}
+        char_tokenizer = AutoTokenizer.from_pretrained(
+            args.char_model, add_prefix_space=True, cache_dir=args.output_dir
         )
+        if test:
+            for each_data in dataset_bookcorpus["train"]["text"][:10]:
+                train_encoding_list.append(
+                    tokenize_bimodal(each_data, char_tokenizer, word_tokenizer)
+                )
+        else:
+            for each_data in (
+                dataset_bookcorpus["train"]["text"] + dataset_wiki["train"]["text"]
+            ):
+                train_encoding_list.append(
+                    tokenize_bimodal(each_data, char_tokenizer, word_tokenizer)
+                )
+
         # store dataset
         with open("data/train_encoding_book_wiki.pickle", "wb") as handle:
             pickle.dump(train_encoding_list, handle, protocol=pickle.HIGHEST_PROTOCOL)
@@ -391,15 +396,17 @@ def fetch_loader_book_wiki_bimodal(model_names, args, test):
 
     data_train = BookWikiDatasetMulti(train_encoding_list, model_names)
     loader_train = torch.utils.data.DataLoader(
-        data_train, batch_size=args.train_batch_size, collate_fn=custom_collate_SST
+        data_train,
+        batch_size=args.train_batch_size,
+        collate_fn=custom_collate_book_wiki,
     )
     return loader_train, None, None
 
 
 def tokenize_bimodal(text, char_tokenizer, word_tokenizer):
-    '''
+    """
     input: 
-        text: input text
+        text: input text type: str
         char_tokenizer: character tokenizer
         word_tokenizer: word tokenizer
     output:
@@ -407,11 +414,11 @@ def tokenize_bimodal(text, char_tokenizer, word_tokenizer):
                        "char" : char_tokenized,
                        "char_ids" :  the #word the character belongs to. Same length as character input_ids
                        }
-    '''
-    ## NOTE: change padding type and custom collator 
-    char_tokenized = char_tokenizer(text, padding = True, truncation = True)
-    word_tokenized = word_tokenizer(text, padding = True, truncation = True)
-    char_ids = [] ## NOTE: should we match CLS tokens to each? 
+    """
+    ## NOTE: change padding type and custom collator
+    char_tokenized = char_tokenizer(text, padding=True, truncation=True)
+    word_tokenized = word_tokenizer(text, padding=True, truncation=True)
+    char_ids = []  ## NOTE: should we match CLS tokens to each?
 
     char_list = char_tokenizer.tokenize(text)
     word_list = word_tokenizer.tokenize(text)
@@ -421,28 +428,6 @@ def tokenize_bimodal(text, char_tokenizer, word_tokenizer):
         char_ids.extend([current_word_id for i in range(len(word))])
         current_word_id += 1
     char_ids.insert(0, -100)
-    char_ids.append(-100) ## [CLS] and [SEP] token should not be aligned
+    char_ids.append(-100)  ## [CLS] and [SEP] token should not be aligned
 
-    return {
-        "char" : char_tokenized,
-        "word" : word_tokenized,
-        "char_ids" : char_ids
-    }
-
-
-
-
-        
-
-
-
-
-    
-
-
-
-
-
-
-
-
+    return {"char": char_tokenized, "word": word_tokenized, "char_word_ids": char_ids}

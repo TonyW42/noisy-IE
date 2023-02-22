@@ -11,6 +11,7 @@ from transformers import (
 )
 import torch
 from models.model import bimodal_trainer
+from models.model import bimodal_base
 from utils.fetch_loader import (
     fetch_loaders,
     fetch_loaders2,
@@ -28,7 +29,7 @@ def train(args):
     model_dict = torch.nn.ModuleDict()
     for model_name in model_names:
         model_dict[model_name] = AutoModel.from_pretrained(
-            model_name, num_labels=args.num_labels
+            model_name, num_labels=args.num_labels, cache_dir=args.output_dir
         )
     model = flat_MTL(model_dict=model_dict, args=args).to(args.device)
 
@@ -86,7 +87,7 @@ def train_MLM(args):
     model_dict = torch.nn.ModuleDict()
     for model_name in model_names:
         model_dict[model_name] = AutoModel.from_pretrained(
-            model_name, num_labels=args.num_labels
+            model_name, num_labels=args.num_labels, cache_dir=args.output_dir
         )
     base = MTL_base(model_dict=model_dict, args=args).to(args.device)
     MLM_model = flat_MLM_w_base(base=base, args=args).to(args.device)
@@ -168,7 +169,7 @@ def train_MLM_corpus(args):
     model_dict = torch.nn.ModuleDict()
     for model_name in model_names:
         model_dict[model_name] = AutoModel.from_pretrained(
-            model_name, num_labels=args.num_labels
+            model_name, num_labels=args.num_labels, cache_dir=args.output_dir
         )
 
     """
@@ -276,7 +277,7 @@ def train_sequential(args):
     model_dict = torch.nn.ModuleDict()
     for model_name in model_names:
         model_dict[model_name] = AutoModel.from_pretrained(
-            model_name, num_labels=args.num_labels
+            model_name, num_labels=args.num_labels, cache_dir=args.output_dir
         )
     model = sequential_MTL(model_dict=model_dict, args=args).to(args.device)
 
@@ -385,8 +386,12 @@ def train_sequential_2(args):
 def train_bimodal_MLM(args, test=False):
     ## initialize model
     model_dict = torch.nn.ModuleDict()
-    model_dict["char"] = AutoModel.from_pretrained(args.char_model)
-    model_dict["word"] = AutoModel.from_pretrained(args.word_model)
+    model_dict["char"] = AutoModel.from_pretrained(
+        args.char_model, cache_dir=args.output_dir
+    )
+    model_dict["word"] = AutoModel.from_pretrained(
+        args.word_model, cache_dir=args.output_dir
+    )
 
     base = bimodal_base(model_dict=model_dict, args=args).to(args.device)
     MLM_model = bimodal_pretrain(base=base, args=args).to(args.device)
