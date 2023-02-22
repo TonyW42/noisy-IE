@@ -1378,9 +1378,9 @@ class bimodal_base(nn.Module):
         )
         char_hidden = char_encoded["last_hidden_state"]
         word_hidden = word_encoded["last_hidden_state"]
-        for i in range(self.args.k):
-            char_new = self.char_co_attention(mod1=char_hidden, mod2=word_hidden)
-            word_new = self.word_co_attention(mod1=word_hidden, mod2=char_hidden)
+        for i in range(self.args.num_att_layers):
+            char_new = self.char_co_attention[i](mod1=char_hidden, mod2=word_hidden)
+            word_new = self.word_co_attention[i](mod1=word_hidden, mod2=char_hidden)
             char_hidden = char_new
             word_hidden = word_new
         return {"char": char_hidden, "word": word_hidden}
@@ -1416,8 +1416,9 @@ class bimodal_trainer(BaseEstimator):
         self.optimizer.zero_grad()
         logits_dict = self.model(data=data)
         ## TODO: check data structure
-        char_mlm_loss = self.criterion(logits_dict["char"], data["char"]["input_ids"])
-        word_mlm_loss = self.criterion(logits_dict["word"], data["word"]["input_ids"])
+        print(logits_dict["char"].shape, data["char"]["input_ids"].shape)
+        char_mlm_loss = self.criterion(torch.reshape(logits_dict["char"], shape = (-1, logits_dict["char"].shape[-1])), data["char"]["input_ids"].view(-1)) # [10 * 44 * vocab_size] -> [(10*44) * vocab_size]
+        word_mlm_loss = self.criterion(torch.reshape(logits_dict["word"], shape = (-1, logits_dict["word"].shape[-1])), data["word"]["input_ids"].view(-1))
         ## TODO: check dimension here
         alignment_loss = self.criterion(
             logits_dict["similarity"], data["char_word_ids"]
