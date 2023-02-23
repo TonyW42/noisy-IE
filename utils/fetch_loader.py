@@ -93,7 +93,7 @@ def custom_collate_SST(data, seq_len=512, probability=0.15):  # (2)
     return return_dict
 
 
-def custom_collate_book_wiki(data, seq_len=44, probability=0.15):
+def custom_collate_book_wiki(data, seq_len=512, probability=0.15):
     ### TODO: random mask by probability given
     model_names = ["word", "char"]
     batch_size = len(data)
@@ -370,16 +370,18 @@ def fetch_loader_book_wiki_bimodal(model_names, args, test):
         train_encoding_list = []
 
         word_tokenizer = AutoTokenizer.from_pretrained(
-            args.word_model, add_prefix_space=True, cache_dir=args.output_dir
+            args.word_model, cache_dir=args.output_dir
         )  ## changed here
         char_tokenizer = AutoTokenizer.from_pretrained(
-            args.char_model, add_prefix_space=True, cache_dir=args.output_dir
+            args.char_model, cache_dir=args.output_dir
         )
         if test:
             for each_data in dataset_bookcorpus["train"]["text"][:10]:
                 train_encoding_list.append(
                     tokenize_bimodal(each_data, char_tokenizer, word_tokenizer)
                 )
+                print("====================")
+                print(train_encoding_list[-1])
         else:
             for each_data in (
                 dataset_bookcorpus["train"]["text"] + dataset_wiki["train"]["text"]
@@ -431,5 +433,7 @@ def tokenize_bimodal(text, char_tokenizer, word_tokenizer):
     ## if not truncated, then there is [SEP] token. append -100
     if char_tokenized["input_ids"][-1] == char_tokenizer.sep_token_id:
         char_ids.append(-100)  ## [CLS] and [SEP] token should not be aligned
+    
+    assert len(char_ids) == len(char_tokenized["input_ids"])
 
     return {"char": char_tokenized, "word": word_tokenized, "char_word_ids": char_ids}
