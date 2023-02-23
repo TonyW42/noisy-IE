@@ -391,8 +391,6 @@ def fetch_loader_book_wiki_bimodal(model_names, args, test):
                 train_encoding_list.append(
                     tokenize_bimodal(each_data, char_tokenizer, word_tokenizer)
                 )
-                print("====================")
-                print(train_encoding_list[-1])
         else:
             for each_data in (
                 dataset_bookcorpus["train"]["text"] + dataset_wiki["train"]["text"]
