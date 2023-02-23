@@ -1379,11 +1379,11 @@ class bimodal_base(nn.Module):
         word_data = data["word"]
         char_encoded = self.model_dict["char"](
             input_ids=char_data["input_ids"].to(self.args.device),
-            attention_mask=char_data["input_ids"].to(self.args.device),
+            attention_mask=char_data["attention_mask"].to(self.args.device),
         )
         word_encoded = self.model_dict["word"](
             input_ids=word_data["input_ids"].to(self.args.device),
-            attention_mask=word_data["input_ids"].to(self.args.device),
+            attention_mask=word_data["attention_mask"].to(self.args.device),
         )
         char_hidden = char_encoded["last_hidden_state"]
         word_hidden = word_encoded["last_hidden_state"]
