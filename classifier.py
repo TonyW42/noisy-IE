@@ -21,6 +21,7 @@ from utils.fetch_loader import (
 )
 import pickle
 import time
+from torch import nn
 
 
 def train(args):
@@ -178,8 +179,10 @@ def train_MLM_corpus(args):
     TODO: metadata to store base model
     """
 
-    base = MTL_base(model_dict=model_dict, args=args).to(args.device)
-    MLM_model = flat_MLM_w_base(base=base, args=args).to(args.device)
+    base = MTL_base(model_dict=model_dict, args=args) #.to(args.device) ## NOTE: no need to push the base to device
+    MLM_model = flat_MLM_w_base(base=base, args=args)#.to(args.device)
+    MLM_model = nn.DataParallel(MLM_model)
+    MLM_model.to(args.device)
 
     criterion = torch.nn.ModuleDict()
     for model_name in model_names:
@@ -390,7 +393,9 @@ def train_bimodal_MLM(args, test=False):
     model_dict["word"] = AutoModel.from_pretrained(args.word_model, cache_dir=args.output_dir)
 
     base = bimodal_base(model_dict=model_dict, args=args).to(args.device)
-    MLM_model = bimodal_pretrain(base=base, args=args).to(args.device)
+    MLM_model = bimodal_pretrain(base=base, args=args)
+    MLM_model = nn.DataParallel(MLM_model)
+    MLM_model.to(args.device)
 
     criterion = torch.nn.CrossEntropyLoss()
 
