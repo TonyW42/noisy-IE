@@ -144,7 +144,7 @@ class BaseEstimator(object):
         """
         raise NotImplementedError("Implement it in the child class!")
 
-    def _train_epoch(self, trainloader, devloader=None):
+    def _train_epoch(self, trainloader, devloader=None, testloader = None):
         self.mode = "train"
         self.model.train()
         tbar = tqdm(trainloader, dynamic_ncols=True)
@@ -175,16 +175,20 @@ class BaseEstimator(object):
                     )
                     self.writer.add_scalar("train/micro/f1", micros[2], self.train_step)
         if devloader is not None:
+            print("========== dev set evaluation ==========")
             self.dev(devloader)
+        if testloader is not None:
+            print("========== test set evaluation ==========")
+            self.dev(testloader)
 
-    def train(self, cfg, trainloader, devloader=None):
+    def train(self, cfg, trainloader, devloader=None, testloader=None):
         self.mode = "train"
         assert self.optimizer is not None, "Optimizer is required"
         assert hasattr(cfg, "output_dir"), "Output directory must be specified"
         make_if_not_exists(cfg.output_dir)
         for i in range(cfg.n_epochs):
             print(f"Training epoch {i}")
-            self._train_epoch(trainloader, devloader)
+            self._train_epoch(trainloader, devloader, testloader)
             self.epoch += 1
             checkpoint_path = os.path.join(
                 cfg.output_dir, "{}.pt".format(datetime.now().strftime("%m-%d_%H-%M"))
