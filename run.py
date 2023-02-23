@@ -13,7 +13,6 @@ import os
 import argparse
 from datetime import datetime
 from classifier import *
-from classifier import train_MLM
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
 
