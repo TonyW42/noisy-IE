@@ -111,20 +111,20 @@ def custom_collate_book_wiki(data, seq_len=512, probability=0.15):
             )
             char_word_id.append(torch.tensor(data[i]["char_word_ids"][:seq_len]))
 
-        input_ids = pad_sequence(input_ids, batch_first=True, padding_value=-100)
+        input_ids = pad_sequence(input_ids, batch_first=True, padding_value=0) # why pad_value = -100 doesn't work
         attention_mask = pad_sequence(attention_mask, batch_first=True, padding_value=0)
         char_word_id = pad_sequence(char_word_id, batch_first=True, padding_value=-100)
 
         rand = torch.rand(input_ids.shape)
         # where the random array is less than 0.15, we set true
         mask_arr = rand < probability
-        mask_arr = mask_arr * (input_ids != -100)
+        mask_arr = mask_arr * (input_ids != 0)
 
         selection = []
         for i in range(input_ids.shape[0]):
             selection.append(torch.flatten(mask_arr[i].nonzero()).tolist())
         for i in range(input_ids.shape[0]):
-            input_ids[i, selection[i]] = -100
+            input_ids[i, selection[i]] = 0
 
         return_dict[m_name]["input_ids"] = input_ids
         return_dict[m_name]["attention_mask"] = attention_mask
