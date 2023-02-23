@@ -442,8 +442,14 @@ def tokenize_bimodal(text, char_tokenizer, word_tokenizer):
         current_word_id += 1
     char_ids.insert(0, -100)
     ## if not truncated, then there is [SEP] token. append -100
-    if char_tokenized["input_ids"][-1] == char_tokenizer.sep_token_id:
-        char_ids.append(-100)  ## [CLS] and [SEP] token should not be aligned
+    # if char_tokenized["input_ids"][-1] == char_tokenizer.sep_token_id:
+    char_ids.append(-100)  ## [CLS] and [SEP] token should not be aligned
+    max_len = char_tokenizer.model_max_length
+    ## if too long, truncate and set last one to -100
+    if len(char_ids) > max_len:
+        char_ids = char_ids[max_len]
+        char_ids[-1] = -100
+
 
     assert len(char_ids) == len(char_tokenized["input_ids"])
 
