@@ -428,6 +428,8 @@ def tokenize_bimodal(text, char_tokenizer, word_tokenizer):
         char_ids.extend([current_word_id for i in range(len(word))])
         current_word_id += 1
     char_ids.insert(0, -100)
-    char_ids.append(-100)  ## [CLS] and [SEP] token should not be aligned
+    ## if not truncated, then there is [SEP] token. append -100
+    if char_tokenized["input_ids"][-1] == char_tokenizer.sep_token_id:
+        char_ids.append(-100)  ## [CLS] and [SEP] token should not be aligned
 
     return {"char": char_tokenized, "word": word_tokenized, "char_word_ids": char_ids}
