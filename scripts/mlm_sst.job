@@ -1,0 +1,9 @@
+#!/bin/bash
+# use the bash shell
+set -x 
+# echo each command to standard out before running it
+date
+# run the Unix 'date' command
+echo "Hello world, from Bridges-2!"
+# run the Unix 'echo' command
+python3 run.py --expr mlm_b --mlm_epochs 50 --n_epochs 100 

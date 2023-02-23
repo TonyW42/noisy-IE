@@ -444,3 +444,31 @@ def train_bimodal_MLM(args, test=False):
     MLM_classifier_.train(args, trainloader, testloader)  ## train MLM
 
     ## TODO: evaluate on WNUT 17 and other task
+
+    model = flat_MTL_w_base(base=base, args=args).to(args.device)
+    optimizer = torch.optim.AdamW(
+        model.parameters(), lr=args.lr, weight_decay=args.weight_decay
+    )
+    # trainloader, devloader, testloader = fetch_loaders(model_names, args) ## TODO: get data
+    trainloader, devloader, testloader = fetch_loaders2(model_names, args)
+    num_training_steps = args.n_epochs * len(trainloader)
+    scheduler = get_scheduler(
+        "linear",
+        optimizer=optimizer,
+        num_warmup_steps=0,
+        num_training_steps=num_training_steps,
+    )
+    logger = None  ## TODO: add logger to track progress
+
+    args.n_epochs = train_epochs
+    classifier = MTL_classifier(
+        model=model,
+        cfg=args,
+        criterion=criterion,
+        optimizer=optimizer,
+        scheduler=scheduler,
+        device=args.device,
+        logger=logger,
+    )
+    if args.mode == "train":
+        classifier.train(args, trainloader, testloader)
