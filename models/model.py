@@ -1379,11 +1379,11 @@ class bimodal_base(nn.Module):
         word_data = data["word"]
         char_encoded = self.model_dict["char"](
             input_ids=char_data["input_ids"].to(self.args.device),
-            attention_mask=char_data["input_ids"].to(self.args.device),
+            attention_mask=char_data["attention_mask"].to(self.args.device),
         )
         word_encoded = self.model_dict["word"](
             input_ids=word_data["input_ids"].to(self.args.device),
-            attention_mask=word_data["input_ids"].to(self.args.device),
+            attention_mask=word_data["attention_mask"].to(self.args.device),
         )
         char_hidden = char_encoded["last_hidden_state"]
         word_hidden = word_encoded["last_hidden_state"]
@@ -1428,7 +1428,6 @@ class bimodal_trainer(BaseEstimator):
         self.optimizer.zero_grad()
         logits_dict = self.model(data=data)
         ## TODO: check data structure
-        print(logits_dict["char"].shape, data["char"]["input_ids"].shape)
         char_mlm_loss = self.criterion(
             torch.reshape(
                 logits_dict["char"], shape=(-1, logits_dict["char"].shape[-1])
@@ -1444,7 +1443,7 @@ class bimodal_trainer(BaseEstimator):
         ## TODO: check dimension here
         # print(torch.reshape(
         #         logits_dict["similarity"].transpose(1, 2), shape=(-1, logits_dict["similarity"].shape[1])
-        #         ).shape, 
+        #         ).shape,
         #         data["char_word_ids"].view(-1).shape)
         # alignment_loss = self.criterion(
         #     torch.reshape(
@@ -1452,10 +1451,10 @@ class bimodal_trainer(BaseEstimator):
         #         ),
         #     data["char_word_ids"].view(-1)
         # )
-        alignment_loss = self.criterion(logits_dict["similarity"], data["char_word_ids"])
+        alignment_loss = self.criterion(
+            logits_dict["similarity"], data["char_word_ids"]
+        )
 
-        print(logits_dict["char"], logits_dict["word"], logits_dict["similarity"])
-        print(char_mlm_loss, word_mlm_loss, alignment_loss)
         ## TODO: weight loss
         loss = char_mlm_loss + word_mlm_loss + alignment_loss
         if self.mode == "train":
