@@ -134,7 +134,7 @@ def custom_collate_book_wiki(data, seq_len=512, probability=0.15):
 
 
 def fetch_loaders(model_names, args):
-    wnut = load_dataset("wnut_17")
+    wnut = load_dataset("wnut_17", cache_dir=args.output_dir)
     train_encoding_list, train_label_list = [], []
     valid_encoding_list, valid_label_list = [], []
     test_encoding_list, test_label_list = [], []
@@ -189,7 +189,7 @@ def fetch_loaders(model_names, args):
 
 
 def fetch_loaders_SST(model_names, args):
-    sst = load_dataset("sst")
+    sst = load_dataset("sst", cache_dir=args.output_dir)
     train_encoding_list = []
     valid_encoding_list = []
     test_encoding_list = []
@@ -249,8 +249,8 @@ def fetch_loader_book_wiki(model_names, args):
             "=================== Data Loaded from Local Data Folder ==================="
         )
     else:
-        dataset_bookcorpus = load_dataset("bookcorpus")
-        dataset_wiki = load_dataset("wikitext", "wikitext-2-v1")
+        dataset_bookcorpus = load_dataset("bookcorpus", cache_dir=args.output_dir)
+        dataset_wiki = load_dataset("wikitext", "wikitext-2-v1", cache_dir=args.output_dir)
         train_encoding_list = []
         valid_encoding_list = []
         test_encoding_list = []
@@ -304,7 +304,7 @@ def fetch_loader_book_wiki(model_names, args):
 
 
 def fetch_loaders2(model_names, args):
-    wnut = load_dataset("wnut_17")
+    wnut = load_dataset("wnut_17", cache_dir=args.output_dir)
     data_loader = wnut_multiple_granularity(wnut, args)
     # model_main = data_loader.model_dict
     tokenized_wnut_main = data_loader.data_
@@ -375,8 +375,8 @@ def fetch_loader_book_wiki_bimodal(model_names, args, test):
             "=================== Data Loaded from Local Data Folder ==================="
         )
     else:
-        dataset_bookcorpus = load_dataset("bookcorpus")
-        dataset_wiki = load_dataset("wikitext", "wikitext-2-v1")
+        dataset_bookcorpus = load_dataset("bookcorpus", cache_dir=args.output_dir)
+        dataset_wiki = load_dataset("wikitext", "wikitext-2-v1", cache_dir=args.output_dir)
 
         train_encoding_list = []
 
