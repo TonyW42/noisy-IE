@@ -1408,7 +1408,7 @@ class bimodal_pretrain(nn.Module):
 
     def forward(self, data):
         encoded = self.base(data=data)
-        char_mlm_logits = self.char_mlm_layer(encoded["word"])
+        char_mlm_logits = self.char_mlm_layer(encoded["char"])
         word_mlm_logits = self.word_mlm_layer(encoded["word"])
         ## TODO: check correctness
         ## TODO: check whether word/char is aligned.
