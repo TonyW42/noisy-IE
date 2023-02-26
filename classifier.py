@@ -179,8 +179,10 @@ def train_MLM_corpus(args):
     TODO: metadata to store base model
     """
 
-    base = MTL_base(model_dict=model_dict, args=args) #.to(args.device) ## NOTE: no need to push the base to device
-    MLM_model = flat_MLM_w_base(base=base, args=args)#.to(args.device)
+    base = MTL_base(
+        model_dict=model_dict, args=args
+    )  # .to(args.device) ## NOTE: no need to push the base to device
+    MLM_model = flat_MLM_w_base(base=base, args=args)  # .to(args.device)
     MLM_model = nn.DataParallel(MLM_model)
     MLM_model.to(args.device)
 
@@ -389,8 +391,12 @@ def train_sequential_2(args):
 def train_bimodal_MLM(args, test=False):
     ## initialize model
     model_dict = torch.nn.ModuleDict()
-    model_dict["char"] = AutoModel.from_pretrained(args.char_model, cache_dir=args.output_dir)
-    model_dict["word"] = AutoModel.from_pretrained(args.word_model, cache_dir=args.output_dir)
+    model_dict["char"] = AutoModel.from_pretrained(
+        args.char_model, cache_dir=args.output_dir
+    )
+    model_dict["word"] = AutoModel.from_pretrained(
+        args.word_model, cache_dir=args.output_dir
+    )
 
     base = bimodal_base(model_dict=model_dict, args=args).to(args.device)
     MLM_model = bimodal_pretrain(base=base, args=args)

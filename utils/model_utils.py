@@ -144,7 +144,7 @@ class BaseEstimator(object):
         """
         raise NotImplementedError("Implement it in the child class!")
 
-    def _train_epoch(self, trainloader, devloader=None, testloader = None):
+    def _train_epoch(self, trainloader, devloader=None, testloader=None):
         self.mode = "train"
         self.model.train()
         tbar = tqdm(trainloader, dynamic_ncols=True)

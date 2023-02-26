@@ -111,7 +111,9 @@ def custom_collate_book_wiki(data, seq_len=512, probability=0.15):
             )
             char_word_id.append(torch.tensor(data[i]["char_word_ids"][:seq_len]))
 
-        input_ids = pad_sequence(input_ids, batch_first=True, padding_value=0) # why pad_value = -100 doesn't work
+        input_ids = pad_sequence(
+            input_ids, batch_first=True, padding_value=0
+        )  # why pad_value = -100 doesn't work
         attention_mask = pad_sequence(attention_mask, batch_first=True, padding_value=0)
         char_word_id = pad_sequence(char_word_id, batch_first=True, padding_value=-100)
 
@@ -250,7 +252,9 @@ def fetch_loader_book_wiki(model_names, args):
         )
     else:
         dataset_bookcorpus = load_dataset("bookcorpus", cache_dir=args.output_dir)
-        dataset_wiki = load_dataset("wikitext", "wikitext-2-v1", cache_dir=args.output_dir)
+        dataset_wiki = load_dataset(
+            "wikitext", "wikitext-2-v1", cache_dir=args.output_dir
+        )
         train_encoding_list = []
         valid_encoding_list = []
         test_encoding_list = []
@@ -376,7 +380,9 @@ def fetch_loader_book_wiki_bimodal(model_names, args, test):
         )
     else:
         dataset_bookcorpus = load_dataset("bookcorpus", cache_dir=args.output_dir)
-        dataset_wiki = load_dataset("wikitext", "wikitext-2-v1", cache_dir=args.output_dir)
+        dataset_wiki = load_dataset(
+            "wikitext", "wikitext-2-v1", cache_dir=args.output_dir
+        )
 
         train_encoding_list = []
 
@@ -445,9 +451,8 @@ def tokenize_bimodal(text, char_tokenizer, word_tokenizer):
     max_len = char_tokenizer.model_max_length
     ## if too long, truncate and set last one to -100
     if len(char_ids) > max_len:
-        char_ids = char_ids[max_len]
+        char_ids = char_ids[:max_len]
         char_ids[-1] = -100
-
 
     assert len(char_ids) == len(char_tokenized["input_ids"])
 
