@@ -481,6 +481,11 @@ class BookWikiDatasetMulti_efficient(Dataset):
                                           self.word_tokenizer, 
                                           self.args)
 
+def clean_text(x):
+  x = x.replace("<unk>", "")
+  x = ' '.join(x.split())
+  return x
+
 def tokenize_bimodal(text, char_tokenizer, word_tokenizer, args):
     """
     input:
@@ -494,6 +499,7 @@ def tokenize_bimodal(text, char_tokenizer, word_tokenizer, args):
                        }
     """
     global count
+    text = clean_text(text)
     ## NOTE: change padding type and custom collator
     if len(text):
         char_tokenized = char_tokenizer(text, padding=True, truncation=True)
@@ -546,6 +552,7 @@ def tokenize_bimodal_efficient(text, char_tokenizer, word_tokenizer, args):
                        }
     """
     ## NOTE: change padding type and custom collator
+    text = clean_text(text)
     if len(text):
         char_tokenized = char_tokenizer(text, padding=True, truncation=True)
         word_tokenized = word_tokenizer(text, padding=True, truncation=True)
