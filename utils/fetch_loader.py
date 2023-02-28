@@ -20,6 +20,8 @@ import os
 import pickle
 from tqdm import tqdm
 
+from datasets import DatasetDict, Dataset
+
 count = 0
 
 
@@ -461,6 +463,24 @@ def fetch_loader_book_wiki_bimodal(model_names, args, test):
     return loader_train, None, None
 
 
+## NOTE: efficient version of dataset 
+## Tokenize "on the fly"
+class BookWikiDatasetMulti_efficient(Dataset):
+    def __init__(self, text, char_tokenizer, word_tokenizer, args):
+        self.text = text
+        self.char_tokenizer = char_tokenizer
+        self.word_tokenizer = word_tokenizer
+        self.args = args
+    
+    def __len__(self):
+        return len(self.text)
+    
+    def __getitem__(self, idx):
+        return tokenize_bimodal_efficient(self.text[idx], 
+                                          self.char_tokenizer, 
+                                          self.word_tokenizer, 
+                                          self.args)
+
 def tokenize_bimodal(text, char_tokenizer, word_tokenizer, args):
     """
     input:
@@ -512,3 +532,59 @@ def tokenize_bimodal(text, char_tokenizer, word_tokenizer, args):
         else:
             count += 1
             return None
+
+def tokenize_bimodal_efficient(text, char_tokenizer, word_tokenizer, args):
+    """
+    input:
+        text: input text type: str
+        char_tokenizer: character tokenizer
+        word_tokenizer: word tokenizer
+    output:
+        result : dict {"word" : word_tokenized,
+                       "char" : char_tokenized,
+                       "char_ids" :  the #word the character belongs to. Same length as character input_ids
+                       }
+    """
+    ## NOTE: change padding type and custom collator
+    if len(text):
+        char_tokenized = char_tokenizer(text, padding=True, truncation=True)
+        word_tokenized = word_tokenizer(text, padding=True, truncation=True)
+        char_ids = []
+
+        char_list = char_tokenizer.tokenize(text)
+        word_list = word_tokenizer.tokenize(text)
+
+        if "xlm" in args.word_model:
+            char_list.insert(0, " ")
+
+        current_word_id = 0
+        for word in word_list:
+            char_ids.extend([current_word_id for i in range(len(word))])
+            current_word_id += 1
+        if "xlm" in args.word_model:
+            char_ids[0] = -100
+        else:
+            char_ids.insert(0, -100)
+        ## if not truncated, then there is [SEP] token. append -100
+        # if char_tokenized["input_ids"][-1] == char_tokenizer.sep_token_id:
+        char_ids.append(-100)  ## [CLS] and [SEP] token should not be aligned
+        max_len = char_tokenizer.model_max_length
+        ## if too long, truncate and set last one to -100
+        if len(char_ids) > max_len:
+            char_ids = char_ids[:max_len]
+            char_ids[-1] = -100
+
+        if len(char_ids) == len(char_tokenized["input_ids"]):
+            return {
+                "char": char_tokenized,
+                "word": word_tokenized,
+                "char_word_ids": char_ids,
+            }
+        else:
+            ## if not match then return empty set. Collator should padd empty set to max len
+            return {
+                "char": {key: [] for key in char_tokenized},
+                "word": {key: [] for key in word_tokenized},
+                "char_word_ids": []
+            }
+            
