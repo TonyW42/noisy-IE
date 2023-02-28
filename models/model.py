@@ -481,7 +481,8 @@ class MTL_classifier(BaseEstimator):
             ]
 
             result_ = self.evaluate_metric["all"].compute(
-                predictions=true_predictions, references=true_labels,
+                predictions=true_predictions,
+                references=true_labels,
             )
             # print(f"{result_}")
             print(f"===== *F1 result: {result_['overall_f1']}======")
@@ -971,7 +972,8 @@ class baseline_classifier(BaseEstimator):
             ]
 
             result_ = self.evaluate_metric["all"].compute(
-                predictions=true_predictions, references=true_labels,
+                predictions=true_predictions,
+                references=true_labels,
             )
             # print(f"{result_}")
             print(f"===== *F1 result: {result_['overall_f1']}======")

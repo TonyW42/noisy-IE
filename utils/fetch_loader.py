@@ -18,6 +18,9 @@ from models.model import (
 from datasets import load_dataset
 import os
 import pickle
+from tqdm import tqdm
+
+count = 0
 
 
 def custom_collate(data, seq_len=512):  # (2)
@@ -232,8 +235,8 @@ def fetch_loaders_SST(model_names, args):
 def fetch_loader_book_wiki(model_names, args):
     """
     To load dataset from bookcorpus and wikitext:
-    - Wikitext: ['wikitext-103-v1', 'wikitext-2-v1', 'wikitext-103-raw-v1', 'wikitext-2-raw-v1']; 
-    - WikiText-2 aims to be of a similar size to the PTB while WikiText-103 contains all articles extracted from Wikipedia. 
+    - Wikitext: ['wikitext-103-v1', 'wikitext-2-v1', 'wikitext-103-raw-v1', 'wikitext-2-raw-v1'];
+    - WikiText-2 aims to be of a similar size to the PTB while WikiText-103 contains all articles extracted from Wikipedia.
     """
 
     """
@@ -364,8 +367,8 @@ def fetch_loaders2(model_names, args):
 def fetch_loader_book_wiki_bimodal(model_names, args, test):
     """
     To load dataset from bookcorpus and wikitext:
-    - Wikitext: ['wikitext-103-v1', 'wikitext-2-v1', 'wikitext-103-raw-v1', 'wikitext-2-raw-v1']; 
-    - WikiText-2 aims to be of a similar size to the PTB while WikiText-103 contains all articles extracted from Wikipedia. 
+    - Wikitext: ['wikitext-103-v1', 'wikitext-2-v1', 'wikitext-103-raw-v1', 'wikitext-2-raw-v1'];
+    - WikiText-2 aims to be of a similar size to the PTB while WikiText-103 contains all articles extracted from Wikipedia.
     """
 
     """
@@ -381,7 +384,7 @@ def fetch_loader_book_wiki_bimodal(model_names, args, test):
     else:
         dataset_bookcorpus = load_dataset("bookcorpus", cache_dir=args.output_dir)
         dataset_wiki = load_dataset(
-            "wikitext", "wikitext-2-v1", cache_dir=args.output_dir
+            "wikitext", "wikitext-103-v1", cache_dir=args.output_dir
         )
 
         train_encoding_list = []
@@ -395,16 +398,35 @@ def fetch_loader_book_wiki_bimodal(model_names, args, test):
         if test:
             for each_data in dataset_bookcorpus["train"]["text"][:10]:
                 train_encoding_list.append(
-                    tokenize_bimodal(each_data, char_tokenizer, word_tokenizer)
+                    tokenize_bimodal(each_data, char_tokenizer, word_tokenizer, args)
                 )
         else:
-            for each_data in (
-                dataset_bookcorpus["train"]["text"] + dataset_wiki["train"]["text"]
-            ):
-                train_encoding_list.append(
-                    tokenize_bimodal(each_data, char_tokenizer, word_tokenizer)
+            # for each_data in (
+            #     dataset_wiki["train"]["text"]
+            #     , dataset_bookcorpus["train"]["text"]
+            # ):
+            for each_data in tqdm(dataset_wiki["train"]["text"]):
+                tokenized_pair = tokenize_bimodal(
+                    each_data, char_tokenizer, word_tokenizer, args
                 )
-
+                if tokenized_pair:
+                    train_encoding_list.append(tokenized_pair)
+            for each_data in tqdm(dataset_bookcorpus["train"]["text"]):
+                tokenized_pair = tokenize_bimodal(
+                    each_data, char_tokenizer, word_tokenizer, args
+                )
+                if tokenized_pair:
+                    train_encoding_list.append(tokenized_pair)
+            print(count)
+            print(
+                count
+                / (
+                    len(
+                        dataset_wiki["train"]["text"]
+                        + dataset_bookcorpus["train"]["text"]
+                    )
+                )
+            )
         # store dataset
         with open("data/train_encoding_book_wiki.pickle", "wb") as handle:
             pickle.dump(train_encoding_list, handle, protocol=pickle.HIGHEST_PROTOCOL)
@@ -416,44 +438,59 @@ def fetch_loader_book_wiki_bimodal(model_names, args, test):
         data_train,
         batch_size=args.train_batch_size,
         collate_fn=custom_collate_book_wiki,
+        num_workers=args.n_workers,
     )
     return loader_train, None, None
 
 
-def tokenize_bimodal(text, char_tokenizer, word_tokenizer):
+def tokenize_bimodal(text, char_tokenizer, word_tokenizer, args):
     """
-    input: 
+    input:
         text: input text type: str
         char_tokenizer: character tokenizer
         word_tokenizer: word tokenizer
     output:
-        result : dict {"word" : word_tokenized, 
+        result : dict {"word" : word_tokenized,
                        "char" : char_tokenized,
                        "char_ids" :  the #word the character belongs to. Same length as character input_ids
                        }
     """
+    global count
     ## NOTE: change padding type and custom collator
-    char_tokenized = char_tokenizer(text, padding=True, truncation=True)
-    word_tokenized = word_tokenizer(text, padding=True, truncation=True)
-    char_ids = []  ## NOTE: should we match CLS tokens to each?
+    if len(text):
+        char_tokenized = char_tokenizer(text, padding=True, truncation=True)
+        word_tokenized = word_tokenizer(text, padding=True, truncation=True)
+        char_ids = []
 
-    char_list = char_tokenizer.tokenize(text)
-    word_list = word_tokenizer.tokenize(text)
+        char_list = char_tokenizer.tokenize(text)
+        word_list = word_tokenizer.tokenize(text)
 
-    current_word_id = 0
-    for word in word_list:
-        char_ids.extend([current_word_id for i in range(len(word))])
-        current_word_id += 1
-    char_ids.insert(0, -100)
-    ## if not truncated, then there is [SEP] token. append -100
-    # if char_tokenized["input_ids"][-1] == char_tokenizer.sep_token_id:
-    char_ids.append(-100)  ## [CLS] and [SEP] token should not be aligned
-    max_len = char_tokenizer.model_max_length
-    ## if too long, truncate and set last one to -100
-    if len(char_ids) > max_len:
-        char_ids = char_ids[:max_len]
-        char_ids[-1] = -100
+        if "xlm" in args.word_model:
+            char_list.insert(0, " ")
 
-    assert len(char_ids) == len(char_tokenized["input_ids"])
+        current_word_id = 0
+        for word in word_list:
+            char_ids.extend([current_word_id for i in range(len(word))])
+            current_word_id += 1
+        if "xlm" in args.word_model:
+            char_ids[0] = -100
+        else:
+            char_ids.insert(0, -100)
+        ## if not truncated, then there is [SEP] token. append -100
+        # if char_tokenized["input_ids"][-1] == char_tokenizer.sep_token_id:
+        char_ids.append(-100)  ## [CLS] and [SEP] token should not be aligned
+        max_len = char_tokenizer.model_max_length
+        ## if too long, truncate and set last one to -100
+        if len(char_ids) > max_len:
+            char_ids = char_ids[:max_len]
+            char_ids[-1] = -100
 
-    return {"char": char_tokenized, "word": word_tokenized, "char_word_ids": char_ids}
+        if len(char_ids) == len(char_tokenized["input_ids"]):
+            return {
+                "char": char_tokenized,
+                "word": word_tokenized,
+                "char_word_ids": char_ids,
+            }
+        else:
+            count += 1
+            return None

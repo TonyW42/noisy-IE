@@ -132,7 +132,11 @@ class CharacterLevelMapping:
                 id_list.append(str(index))
                 index += 1
             wnut_character_level[type_] = Dataset.from_dict(
-                {"id": id_list, "tokens": token_list, "ner_tags": ner_tag_list,}
+                {
+                    "id": id_list,
+                    "tokens": token_list,
+                    "ner_tags": ner_tag_list,
+                }
             )
 
         iterate_dataset("train")

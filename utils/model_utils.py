@@ -53,9 +53,9 @@ class BaseClassifier(nn.Module):
         """
         Input
         ----------
-        backbone: 
+        backbone:
             Usually a (pretrained) BertModel, or any sentence embedding extractor
-        head: 
+        head:
             Usually a FFN, or any NN for classification
         """
         super().__init__()
@@ -66,19 +66,21 @@ class BaseClassifier(nn.Module):
         """
         Input
         ----------
-        input_ids: 
+        input_ids:
             Raw text => tokens => input_ids, starting with id of [CLS] and ending with id of [SEP] (or padding id 0), shape (B, max_len)
-        input_mask: 
+        input_mask:
             1 for tokens that are not padded (hence not masked) and 0 otherwise, shape (B, max_len)
-        set_ids: 
+        set_ids:
             Segment identifiers, but in this case 0 for all tokens, shape (B, max_len)
         Output
         ----------
-        logits: 
+        logits:
             Logit of being true for each label, shape (B, n_labels)
         """
         encoded = self.backbone(
-            input_ids=input_ids, attention_mask=input_mask, token_type_ids=seg_ids,
+            input_ids=input_ids,
+            attention_mask=input_mask,
+            token_type_ids=seg_ids,
         )
         sentence_embd = encoded[1]  # 'pooler_output'
         logits = self.head(sentence_embd)
@@ -124,22 +126,22 @@ class BaseEstimator(object):
 
     def step(self, data):
         """
-        This function is responsible for feeding the data into the model and obtain predictions. 
-        If `self.mode == 'train'`, perform backpropagation and update optimizer and, if given, scheduler; 
-        if `self.mode == 'dev'`, we still compute loss and return ground true label, but no backpropagation nor optimizer update; 
-        if `self.mode == 'test'`, no ground true label is presented so loss will not be calculated. 
+        This function is responsible for feeding the data into the model and obtain predictions.
+        If `self.mode == 'train'`, perform backpropagation and update optimizer and, if given, scheduler;
+        if `self.mode == 'dev'`, we still compute loss and return ground true label, but no backpropagation nor optimizer update;
+        if `self.mode == 'test'`, no ground true label is presented so loss will not be calculated.
         Input
         ----------
-        data: 
+        data:
             A dictionary of mini-batch input obtained from Dataset.__getitem__, each with shape (B, max_len), type torch.tensor
             Before fed into the model, inputs should be cast to appropriate the type (torch.long) and converted to self.device
         Output
         ----------
-        loss: 
+        loss:
             A scalar for the entire batch, type float; None if no label provided
-        prob: 
+        prob:
             Model predictions as the probability for each label, shape (B, n_labels), type np.ndarray
-        y: 
+        y:
             Ground true labels for the batch, shape (B, n_labels), type np.ndarray; None if no label provided
         """
         raise NotImplementedError("Implement it in the child class!")
