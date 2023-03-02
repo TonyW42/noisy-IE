@@ -192,6 +192,10 @@ def train_MLM_corpus(args):
         MLM_model = nn.DataParallel(MLM_model)
         MLM_model.to(args.device)
 
+    # freeze the base model
+    for param in MLM_model.parameters():
+        param.requires_grad = False
+
     criterion = torch.nn.ModuleDict()
     for model_name in model_names:
         criterion[model_name] = torch.nn.CrossEntropyLoss().to(args.device)
