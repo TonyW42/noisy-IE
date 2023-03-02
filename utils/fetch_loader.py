@@ -399,27 +399,24 @@ def fetch_loader_book_wiki_bimodal(model_names, args, test):
         )
         if test:
             wiki_length = len(dataset_wiki["train"]["text"])
-            for each_data in tqdm(dataset_wiki["train"]["text"][:int(wiki_length/25)]):
+            for each_data in tqdm(
+                dataset_wiki["train"]["text"][: int(wiki_length / 100)]
+            ):
                 tokenized_pair = tokenize_bimodal(
                     each_data, char_tokenizer, word_tokenizer, args
                 )
                 if tokenized_pair:
                     train_encoding_list.append(tokenized_pair)
-            
-            bookcorpus_length = len(dataset_bookcorpus["train"]["text"])
-            for each_data in tqdm(dataset_bookcorpus["train"]["text"][:int(bookcorpus_length/25)]):
-                tokenized_pair = tokenize_bimodal(
-                    each_data, char_tokenizer, word_tokenizer, args
-                )
-                if tokenized_pair:
-                    train_encoding_list.append(tokenized_pair)
+            bookcorpus_length = 0
+            # bookcorpus_length = len(dataset_bookcorpus["train"]["text"])
+            # for each_data in tqdm(dataset_bookcorpus["train"]["text"][:int(bookcorpus_length/25)]):
+            #     tokenized_pair = tokenize_bimodal(
+            #         each_data, char_tokenizer, word_tokenizer, args
+            #     )
+            #     if tokenized_pair:
+            #         train_encoding_list.append(tokenized_pair)
             print(count)
-            print(
-                10 * count
-                / (
-                    wiki_length + bookcorpus_length
-                )
-            )
+            print(100 * count / (wiki_length + bookcorpus_length))
         else:
             # for each_data in (
             #     dataset_wiki["train"]["text"]
@@ -432,7 +429,7 @@ def fetch_loader_book_wiki_bimodal(model_names, args, test):
                 )
                 if tokenized_pair:
                     train_encoding_list.append(tokenized_pair)
-            
+
             bookcorpus_length = len(dataset_bookcorpus["train"]["text"])
             for each_data in tqdm(dataset_bookcorpus["train"]["text"]):
                 tokenized_pair = tokenize_bimodal(
@@ -441,12 +438,7 @@ def fetch_loader_book_wiki_bimodal(model_names, args, test):
                 if tokenized_pair:
                     train_encoding_list.append(tokenized_pair)
             print(count)
-            print(
-                count
-                / (
-                    wiki_length + bookcorpus_length
-                )
-            )
+            print(count / (wiki_length + bookcorpus_length))
         # store dataset
         with open("data/train_encoding_book_wiki.pickle", "wb") as handle:
             pickle.dump(train_encoding_list, handle, protocol=pickle.HIGHEST_PROTOCOL)
@@ -463,7 +455,7 @@ def fetch_loader_book_wiki_bimodal(model_names, args, test):
     return loader_train, None, None
 
 
-## NOTE: efficient version of dataset 
+## NOTE: efficient version of dataset
 ## Tokenize "on the fly"
 class BookWikiDatasetMulti_efficient(Dataset):
     def __init__(self, text, char_tokenizer, word_tokenizer, args):
@@ -471,20 +463,21 @@ class BookWikiDatasetMulti_efficient(Dataset):
         self.char_tokenizer = char_tokenizer
         self.word_tokenizer = word_tokenizer
         self.args = args
-    
+
     def __len__(self):
         return len(self.text)
-    
+
     def __getitem__(self, idx):
-        return tokenize_bimodal_efficient(self.text[idx], 
-                                          self.char_tokenizer, 
-                                          self.word_tokenizer, 
-                                          self.args)
+        return tokenize_bimodal_efficient(
+            self.text[idx], self.char_tokenizer, self.word_tokenizer, self.args
+        )
+
 
 def clean_text(x):
-  x = x.replace("<unk>", "")
-  x = ' '.join(x.split())
-  return x
+    x = x.replace("<unk>", "")
+    x = " ".join(x.split())
+    return x
+
 
 def tokenize_bimodal(text, char_tokenizer, word_tokenizer, args):
     """
@@ -539,6 +532,7 @@ def tokenize_bimodal(text, char_tokenizer, word_tokenizer, args):
             count += 1
             return None
 
+
 def tokenize_bimodal_efficient(text, char_tokenizer, word_tokenizer, args):
     """
     input:
@@ -592,6 +586,5 @@ def tokenize_bimodal_efficient(text, char_tokenizer, word_tokenizer, args):
             return {
                 "char": {key: [] for key in char_tokenized},
                 "word": {key: [] for key in word_tokenized},
-                "char_word_ids": []
+                "char_word_ids": [],
             }
-            
