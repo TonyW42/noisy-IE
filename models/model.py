@@ -1443,16 +1443,6 @@ class bimodal_trainer(BaseEstimator):
             data["word"]["input_ids"].view(-1),
         )
         ## TODO: check dimension here
-        # print(torch.reshape(
-        #         logits_dict["similarity"].transpose(1, 2), shape=(-1, logits_dict["similarity"].shape[1])
-        #         ).shape,
-        #         data["char_word_ids"].view(-1).shape)
-        # alignment_loss = self.criterion(
-        #     torch.reshape(
-        #         logits_dict["similarity"], shape=(-1, logits_dict["similarity"].shape[-1])
-        #         ),
-        #     data["char_word_ids"].view(-1)
-        # )
         alignment_loss = self.criterion(
             logits_dict["similarity"], data["char_word_ids"]
         )
@@ -1460,6 +1450,7 @@ class bimodal_trainer(BaseEstimator):
         ## TODO: weight loss
         loss = char_mlm_loss + word_mlm_loss + alignment_loss
         if self.mode == "train":
+            # self.args.accelerator.backward(loss)
             loss.backward()
             self.optimizer.step()
             if self.scheduler is not None:
