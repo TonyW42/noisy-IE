@@ -258,7 +258,7 @@ def fetch_loader_book_wiki(model_names, args):
     else:
         # dataset_bookcorpus = load_dataset("bookcorpus", cache_dir=args.output_dir)
         dataset_wiki = load_dataset(
-            "wikitext", "wikitext-103-v1", cache_dir=args.output_dir
+            "wikitext", "wikitext-2-v1", cache_dir=args.output_dir
         )
         train_encoding_list = []
         valid_encoding_list = []
