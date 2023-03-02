@@ -418,10 +418,6 @@ def fetch_loader_book_wiki_bimodal(model_names, args, test):
             print(count)
             print(100 * count / (wiki_length + bookcorpus_length))
         else:
-            # for each_data in (
-            #     dataset_wiki["train"]["text"]
-            #     , dataset_bookcorpus["train"]["text"]
-            # ):
             wiki_length = len(dataset_wiki["train"]["text"])
             for each_data in tqdm(dataset_wiki["train"]["text"]):
                 tokenized_pair = tokenize_bimodal(
@@ -446,12 +442,19 @@ def fetch_loader_book_wiki_bimodal(model_names, args, test):
         print("=================== Data Loaded from HuggingFace ===================")
 
     data_train = BookWikiDatasetMulti(train_encoding_list, model_names)
-    loader_train = torch.utils.data.DataLoader(
+    if args.test:
+        loader_train = torch.utils.data.DataLoader(
         data_train,
         batch_size=args.train_batch_size,
         collate_fn=custom_collate_book_wiki,
-        num_workers=args.n_workers,
     )
+    else:
+        loader_train = torch.utils.data.DataLoader(
+            data_train,
+            batch_size=args.train_batch_size,
+            collate_fn=custom_collate_book_wiki,
+            num_workers=args.n_workers,
+        )
     return loader_train, None, None
 
 
