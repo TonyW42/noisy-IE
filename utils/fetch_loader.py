@@ -399,23 +399,23 @@ def fetch_loader_book_wiki_bimodal(model_names, args, test):
         )
         if test:
             wiki_length = len(dataset_wiki["train"]["text"])
-            for each_data in tqdm(dataset_wiki["train"]["text"][:int(wiki_length/25)]):
+            for each_data in tqdm(dataset_wiki["train"]["text"][:int(wiki_length/100)]):
                 tokenized_pair = tokenize_bimodal(
                     each_data, char_tokenizer, word_tokenizer, args
                 )
                 if tokenized_pair:
                     train_encoding_list.append(tokenized_pair)
-            
-            bookcorpus_length = len(dataset_bookcorpus["train"]["text"])
-            for each_data in tqdm(dataset_bookcorpus["train"]["text"][:int(bookcorpus_length/25)]):
-                tokenized_pair = tokenize_bimodal(
-                    each_data, char_tokenizer, word_tokenizer, args
-                )
-                if tokenized_pair:
-                    train_encoding_list.append(tokenized_pair)
+            bookcorpus_length = 0
+            # bookcorpus_length = len(dataset_bookcorpus["train"]["text"])
+            # for each_data in tqdm(dataset_bookcorpus["train"]["text"][:int(bookcorpus_length/25)]):
+            #     tokenized_pair = tokenize_bimodal(
+            #         each_data, char_tokenizer, word_tokenizer, args
+            #     )
+            #     if tokenized_pair:
+            #         train_encoding_list.append(tokenized_pair)
             print(count)
             print(
-                10 * count
+                100 * count
                 / (
                     wiki_length + bookcorpus_length
                 )
