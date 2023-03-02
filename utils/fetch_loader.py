@@ -256,9 +256,9 @@ def fetch_loader_book_wiki(model_names, args):
             "=================== Data Loaded from Local Data Folder ==================="
         )
     else:
-        dataset_bookcorpus = load_dataset("bookcorpus", cache_dir=args.output_dir)
+        # dataset_bookcorpus = load_dataset("bookcorpus", cache_dir=args.output_dir)
         dataset_wiki = load_dataset(
-            "wikitext", "wikitext-2-v1", cache_dir=args.output_dir
+            "wikitext", "wikitext-103-v1", cache_dir=args.output_dir
         )
         train_encoding_list = []
         valid_encoding_list = []
@@ -268,18 +268,17 @@ def fetch_loader_book_wiki(model_names, args):
                 model_name, add_prefix_space=True, cache_dir=args.output_dir
             )  ## changed here
             xlm_train_encoding = tokenizer(
-                dataset_bookcorpus["train"]["text"] + dataset_wiki["train"]["text"],
+                dataset_wiki["train"]["text"],
                 padding="longest",
                 truncation=True,
             )
             xlm_valid_encoding = tokenizer(
-                dataset_bookcorpus["validation"]["text"]
-                + dataset_wiki["validation"]["text"],
+                dataset_wiki["validation"]["text"],
                 padding="longest",
                 truncation=True,
             )
             xlm_test_encoding = tokenizer(
-                dataset_bookcorpus["test"]["text"] + dataset_wiki["validation"]["text"],
+                dataset_wiki["validation"]["text"],
                 padding="longest",
                 truncation=True,
             )
@@ -444,10 +443,10 @@ def fetch_loader_book_wiki_bimodal(model_names, args, test):
     data_train = BookWikiDatasetMulti(train_encoding_list, model_names)
     if args.test:
         loader_train = torch.utils.data.DataLoader(
-        data_train,
-        batch_size=args.train_batch_size,
-        collate_fn=custom_collate_book_wiki,
-    )
+            data_train,
+            batch_size=args.train_batch_size,
+            collate_fn=custom_collate_book_wiki,
+        )
     else:
         loader_train = torch.utils.data.DataLoader(
             data_train,

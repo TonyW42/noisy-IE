@@ -23,6 +23,8 @@ import pickle
 import time
 from torch import nn
 
+# from accelerate import Accelerator
+
 
 def train(args):
     ## initialize model
@@ -394,6 +396,8 @@ def train_sequential_2(args):
 
 def train_bimodal_MLM(args, test=False):
     ## initialize model
+    # accelerator = Accelerator()
+
     model_dict = torch.nn.ModuleDict()
     model_dict["char"] = AutoModel.from_pretrained(
         args.char_model, cache_dir=args.output_dir
@@ -430,6 +434,8 @@ def train_bimodal_MLM(args, test=False):
     trainloader, devloader, testloader = fetch_loader_book_wiki_bimodal(
         model_names, args, test=test
     )
+
+    # MLM_model, optimizer, trainloader = accelerator.prepare(MLM_model, optimizer, trainloader)
     ## NOTE: structure of data
     ## data : {"char":  char_data, "word": word_data}
     ## char_data: what returned by char tokenizer + word_id_for_char
@@ -445,6 +451,7 @@ def train_bimodal_MLM(args, test=False):
 
     train_epochs = args.n_epochs
     args.n_epochs = args.mlm_epochs
+    # args.accelerator = accelerator
     MLM_classifier_ = bimodal_trainer(
         model=MLM_model,
         cfg=args,
