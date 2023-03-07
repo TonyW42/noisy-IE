@@ -1435,17 +1435,18 @@ class bimodal_trainer(BaseEstimator):
                 logits_dict["char"], shape=(-1, logits_dict["char"].shape[-1])
             ),
             data["char"]["input_ids"].view(-1),
-        )  # [10 * 44 * vocab_size] -> [(10*44) * vocab_size]
+        ).to(self.cfg.device)  
+        # [10 * 44 * vocab_size] -> [(10*44) * vocab_size]
         word_mlm_loss = self.criterion(
             torch.reshape(
                 logits_dict["word"], shape=(-1, logits_dict["word"].shape[-1])
             ),
             data["word"]["input_ids"].view(-1),
-        )
+        ).to(self.cfg.device)
         ## TODO: check dimension here
         alignment_loss = self.criterion(
             logits_dict["similarity"], data["char_word_ids"]
-        )
+        ).to(self.cfg.device)
 
         ## TODO: weight loss
         loss = char_mlm_loss + word_mlm_loss + alignment_loss
