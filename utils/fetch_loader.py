@@ -110,12 +110,10 @@ def custom_collate_book_wiki(data, seq_len=512, probability=0.15):
         attention_mask = []
         char_word_id = []
         for i in range(batch_size):
-            input_ids.append(torch.tensor(data[i][m_name]["input_ids"][:seq_len]))
-            attention_mask.append(
-                torch.tensor(data[i][m_name]["attention_mask"][:seq_len])
-            )
+            attention_mask.append(torch.tensor(data[i][m_name]["attention_mask"][:seq_len]))
             char_word_id.append(torch.tensor(data[i]["char_word_ids"][:seq_len]))
-
+            input_ids.append(torch.tensor(data[i][m_name]["input_ids"][:seq_len]))
+            
         input_ids = pad_sequence(
             input_ids, batch_first=True, padding_value=0
         )  # why pad_value = -100 doesn't work
@@ -376,71 +374,72 @@ def fetch_loader_book_wiki_bimodal(model_names, args, test):
     Store dataset in local to save time, 
     if detected dataset is already downloaded, load from the disk
     """
-    if os.path.isfile("data/train_encoding_book_wiki.pickle"):
-        with open("data/train_encoding_book_wiki.pickle", "rb") as handle:
-            train_encoding_list = pickle.load(handle)
-        print(
-            "=================== Data Loaded from Local Data Folder ==================="
-        )
-    else:
-        dataset_bookcorpus = load_dataset("bookcorpus", cache_dir=args.output_dir)
-        dataset_wiki = load_dataset(
-            "wikitext", "wikitext-103-v1", cache_dir=args.output_dir
-        )
+    # if os.path.isfile("data/train_encoding_book_wiki.pickle"):
+    #     with open("data/train_encoding_book_wiki.pickle", "rb") as handle:
+    #         train_encoding_list = pickle.load(handle)
+    #     print(
+    #         "=================== Data Loaded from Local Data Folder ==================="
+    #     )
+    # else:
+    dataset_bookcorpus = load_dataset("bookcorpus", cache_dir=args.output_dir)
+    dataset_wiki = load_dataset(
+        "wikitext", "wikitext-103-v1", cache_dir=args.output_dir
+    )
 
-        train_encoding_list = []
+    # train_encoding_list = []
 
-        word_tokenizer = AutoTokenizer.from_pretrained(
-            args.word_model, cache_dir=args.output_dir
-        )  ## changed here
-        char_tokenizer = AutoTokenizer.from_pretrained(
-            args.char_model, cache_dir=args.output_dir
-        )
-        if test:
-            wiki_length = len(dataset_wiki["train"]["text"])
-            for each_data in tqdm(
-                dataset_wiki["train"]["text"][: int(wiki_length / 100)]
-            ):
-                tokenized_pair = tokenize_bimodal(
-                    each_data, char_tokenizer, word_tokenizer, args
-                )
-                if tokenized_pair:
-                    train_encoding_list.append(tokenized_pair)
-            bookcorpus_length = 0
-            # bookcorpus_length = len(dataset_bookcorpus["train"]["text"])
-            # for each_data in tqdm(dataset_bookcorpus["train"]["text"][:int(bookcorpus_length/25)]):
-            #     tokenized_pair = tokenize_bimodal(
-            #         each_data, char_tokenizer, word_tokenizer, args
-            #     )
-            #     if tokenized_pair:
-            #         train_encoding_list.append(tokenized_pair)
-            print(count)
-            print(100 * count / (wiki_length + bookcorpus_length))
-        else:
-            wiki_length = len(dataset_wiki["train"]["text"])
-            for each_data in tqdm(dataset_wiki["train"]["text"]):
-                tokenized_pair = tokenize_bimodal(
-                    each_data, char_tokenizer, word_tokenizer, args
-                )
-                if tokenized_pair:
-                    train_encoding_list.append(tokenized_pair)
+    word_tokenizer = AutoTokenizer.from_pretrained(
+        args.word_model, cache_dir=args.output_dir
+    )  ## changed here
+    char_tokenizer = AutoTokenizer.from_pretrained(
+        args.char_model, cache_dir=args.output_dir
+    )
+        # if test:
+        #     wiki_length = len(dataset_wiki["train"]["text"])
+        #     for each_data in tqdm(
+        #         dataset_wiki["train"]["text"][: int(wiki_length / 100)]
+        #     ):
+        #         tokenized_pair = tokenize_bimodal(
+        #             each_data, char_tokenizer, word_tokenizer, args
+        #         )
+        #         if tokenized_pair:
+        #             train_encoding_list.append(tokenized_pair)
+        #     bookcorpus_length = 0
+        #     # bookcorpus_length = len(dataset_bookcorpus["train"]["text"])
+        #     # for each_data in tqdm(dataset_bookcorpus["train"]["text"][:int(bookcorpus_length/25)]):
+        #     #     tokenized_pair = tokenize_bimodal(
+        #     #         each_data, char_tokenizer, word_tokenizer, args
+        #     #     )
+        #     #     if tokenized_pair:
+        #     #         train_encoding_list.append(tokenized_pair)
+        #     print(count)
+        #     print(100 * count / (wiki_length + bookcorpus_length))
+        # else:
+        #     wiki_length = len(dataset_wiki["train"]["text"])
+        #     for each_data in tqdm(dataset_wiki["train"]["text"]):
+        #         tokenized_pair = tokenize_bimodal(
+        #             each_data, char_tokenizer, word_tokenizer, args
+        #         )
+        #         if tokenized_pair:
+        #             train_encoding_list.append(tokenized_pair)
 
-            bookcorpus_length = len(dataset_bookcorpus["train"]["text"])
-            for each_data in tqdm(dataset_bookcorpus["train"]["text"]):
-                tokenized_pair = tokenize_bimodal(
-                    each_data, char_tokenizer, word_tokenizer, args
-                )
-                if tokenized_pair:
-                    train_encoding_list.append(tokenized_pair)
-            print(count)
-            print(count / (wiki_length + bookcorpus_length))
-        # store dataset
-        with open("data/train_encoding_book_wiki.pickle", "wb") as handle:
-            pickle.dump(train_encoding_list, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        #     bookcorpus_length = len(dataset_bookcorpus["train"]["text"])
+        #     for each_data in tqdm(dataset_bookcorpus["train"]["text"]):
+        #         tokenized_pair = tokenize_bimodal(
+        #             each_data, char_tokenizer, word_tokenizer, args
+        #         )
+        #         if tokenized_pair:
+        #             train_encoding_list.append(tokenized_pair)
+        #     print(count)
+        #     print(count / (wiki_length + bookcorpus_length))
+        # # store dataset
+        # with open("data/train_encoding_book_wiki.pickle", "wb") as handle:
+        #     pickle.dump(train_encoding_list, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-        print("=================== Data Loaded from HuggingFace ===================")
+        # print("=================== Data Loaded from HuggingFace ===================")
 
-    data_train = BookWikiDatasetMulti(train_encoding_list, model_names)
+    # data_train = BookWikiDatasetMulti(train_encoding_list, model_names)
+    data_train = BookWikiDatasetMulti_efficient(dataset_wiki["train"]["text"][:5], char_tokenizer, word_tokenizer, args)
     if args.test:
         loader_train = torch.utils.data.DataLoader(
             data_train,
@@ -452,7 +451,7 @@ def fetch_loader_book_wiki_bimodal(model_names, args, test):
             data_train,
             batch_size=args.train_batch_size,
             collate_fn=custom_collate_book_wiki,
-            num_workers=args.n_workers,
+            # num_workers=args.n_workers,
         )
     return loader_train, None, None
 
@@ -549,9 +548,9 @@ def tokenize_bimodal_efficient(text, char_tokenizer, word_tokenizer, args):
     """
     ## NOTE: change padding type and custom collator
     text = clean_text(text)
+    char_tokenized = char_tokenizer(text, padding=True, truncation=True)
+    word_tokenized = word_tokenizer(text, padding=True, truncation=True)
     if len(text):
-        char_tokenized = char_tokenizer(text, padding=True, truncation=True)
-        word_tokenized = word_tokenizer(text, padding=True, truncation=True)
         char_ids = []
 
         char_list = char_tokenizer.tokenize(text)
@@ -583,10 +582,9 @@ def tokenize_bimodal_efficient(text, char_tokenizer, word_tokenizer, args):
                 "word": word_tokenized,
                 "char_word_ids": char_ids,
             }
-        else:
-            ## if not match then return empty set. Collator should padd empty set to max len
-            return {
-                "char": {key: [] for key in char_tokenized},
-                "word": {key: [] for key in word_tokenized},
-                "char_word_ids": [],
-            }
+    ## if not match then return empty set. Collator should padd empty set to max len
+    return {
+        "char": {key: torch.tensor([], dtype=torch.long) for key in char_tokenized},
+        "word": {key: torch.tensor([], dtype=torch.long) for key in word_tokenized},
+        "char_word_ids": torch.tensor([], dtype=torch.long),
+    }
