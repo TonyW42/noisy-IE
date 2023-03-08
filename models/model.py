@@ -1508,6 +1508,27 @@ class bimodal_trainer(BaseEstimator):
         }
 
 
+
+class bimodal_ner(nn.Module):
+    def __init__(self, base, args):
+        super().__init__()
+        self.args = args
+        self.base = base
+        self.lin = nn.Linear(base.model_dict["word"].config.hidden_size, args.num_labels)
+
+    def forward(self, data):
+        '''
+        only use word logits 
+        '''
+        hidden = self.base(data)
+        logits = self.lin(hidden["word"])
+        return logits
+
+
+
+class bimodal_classifier(baseline_classifier):
+    print("Bimodal classifier is the same as baseline classfier!")
+
 if __name__ == "__main__":
     ## add arguments
     parser = argparse.ArgumentParser()
