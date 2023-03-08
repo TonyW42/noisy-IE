@@ -85,6 +85,8 @@ if __name__ == "__main__":
         "--embed_size_dict",
         type=dict,
         default={
+            "char": 768,
+            "word": 768,
             "google/canine-s": 768,
             "google/canine-c": 768,
             "bert-base-cased": 768,
@@ -102,6 +104,8 @@ if __name__ == "__main__":
     args.train = True if args.mode == "True" else False
     # args.model_names = [args.granularities_model[key] for key in args.granularities_model]
     args.model_names = args.model_list.split("|")
+    # args.vocab_size = {'char': 1114112}
+    args.vocab_size = {'char': 60000}
 
     if not args.device:
         if torch.cuda.is_available():

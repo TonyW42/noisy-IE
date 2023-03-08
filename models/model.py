@@ -307,7 +307,7 @@ class MLM_classifier(BaseEstimator):
             count = 0
             for model_name, logit in logits_dict.items():
                 vocab_size = (
-                    1114112
+                    self.cfg.vocab_size['char']
                     if model_name == "google/canine-s"
                     else self.model.base.model_dict[model_name].config.vocab_size
                 )
@@ -837,7 +837,7 @@ class flat_MLM_w_base(nn.Module):
         for model_name in base.model_dict:
             # add one linear layer per model
             vocab_size = (
-                1114112
+                self.args.vocab_size['char']
                 if model_name == "google/canine-s"
                 else base.model_dict[model_name].config.vocab_size
             )
@@ -1402,7 +1402,7 @@ class bimodal_base(nn.Module):
 class bimodal_pretrain(nn.Module):
     def __init__(self, base, args):
         super().__init__()
-        args.char_vocab_size = 1114112
+        args.char_vocab_size = args.vocab_size['char']
         # args.char_vocab_size = base.model_dict["char"].config.vocab_size
         args.word_vocab_size = base.model_dict["word"].config.vocab_size
         self.base = base
