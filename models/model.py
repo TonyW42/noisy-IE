@@ -17,13 +17,9 @@ from datasets import load_metric
 from models.dataset_preprocessing import (
     WNUTDatasetMulti,
     SSTDatasetMulti,
-    BookWikiDatasetMulti
+    BookWikiDatasetMulti,
 )
-from models.info import (
-    id2tag,
-    tag2id,
-    encode_tags 
-)
+from models.info import id2tag, tag2id, encode_tags
 
 
 ## need dataset/loader structure such as the following:
@@ -209,7 +205,7 @@ class MLM_classifier(BaseEstimator):
             count = 0
             for model_name, logit in logits_dict.items():
                 vocab_size = (
-                    self.cfg.vocab_size['char']
+                    self.cfg.vocab_size["char"]
                     if model_name == "google/canine-s"
                     else self.model.base.model_dict[model_name].config.vocab_size
                 )
@@ -739,7 +735,7 @@ class flat_MLM_w_base(nn.Module):
         for model_name in base.model_dict:
             # add one linear layer per model
             vocab_size = (
-                self.args.vocab_size['char']
+                self.args.vocab_size["char"]
                 if model_name == "google/canine-s"
                 else base.model_dict[model_name].config.vocab_size
             )
@@ -1304,7 +1300,7 @@ class bimodal_base(nn.Module):
 class bimodal_pretrain(nn.Module):
     def __init__(self, base, args):
         super().__init__()
-        args.char_vocab_size = args.vocab_size['char']
+        args.char_vocab_size = args.vocab_size["char"]
         # args.char_vocab_size = base.model_dict["char"].config.vocab_size
         args.word_vocab_size = base.model_dict["word"].config.vocab_size
         self.base = base
@@ -1339,7 +1335,7 @@ class bimodal_trainer(BaseEstimator):
                 logits_dict["char"], shape=(-1, logits_dict["char"].shape[-1])
             ),
             data["char"]["input_ids"].view(-1).to(self.cfg.device),
-        ).to(self.cfg.device)  
+        ).to(self.cfg.device)
         # [10 * 44 * vocab_size] -> [(10*44) * vocab_size]
         word_mlm_loss = self.criterion(
             torch.reshape(
@@ -1410,26 +1406,27 @@ class bimodal_trainer(BaseEstimator):
         }
 
 
-
 class bimodal_ner(nn.Module):
     def __init__(self, base, args):
         super().__init__()
         self.args = args
         self.base = base
-        self.lin = nn.Linear(base.model_dict["word"].config.hidden_size, args.num_labels)
+        self.lin = nn.Linear(
+            base.model_dict["word"].config.hidden_size, args.num_labels
+        )
 
     def forward(self, data):
-        '''
-        only use word logits 
-        '''
+        """
+        only use word logits
+        """
         hidden = self.base(data)
         logits = self.lin(hidden["word"])
         return logits
 
 
-
 class bimodal_classifier(baseline_classifier):
     print("Bimodal classifier is the same as baseline classfier!")
+
 
 if __name__ == "__main__":
     ## add arguments

@@ -111,10 +111,12 @@ def custom_collate_book_wiki(data, seq_len=512, probability=0.15):
         attention_mask = []
         char_word_id = []
         for i in range(batch_size):
-            attention_mask.append(torch.tensor(data[i][m_name]["attention_mask"][:seq_len]))
+            attention_mask.append(
+                torch.tensor(data[i][m_name]["attention_mask"][:seq_len])
+            )
             char_word_id.append(torch.tensor(data[i]["char_word_ids"][:seq_len]))
             input_ids.append(torch.tensor(data[i][m_name]["input_ids"][:seq_len]))
-            
+
         input_ids = pad_sequence(
             input_ids, batch_first=True, padding_value=0
         )  # why pad_value = -100 doesn't work
@@ -151,13 +153,13 @@ def custom_collate_book_wiki_eval(data, seq_len=512, probability=0.15):
         attention_mask = []
         labels = []
         for i in range(batch_size):
-            attention_mask.append(torch.tensor(data[i][m_name]["attention_mask"][:seq_len]))
+            attention_mask.append(
+                torch.tensor(data[i][m_name]["attention_mask"][:seq_len])
+            )
             input_ids.append(torch.tensor(data[i][m_name]["input_ids"][:seq_len]))
             labels.append(torch.tensor(data[i][m_name]["labels"][:seq_len]))
-            
-        input_ids = pad_sequence(
-            input_ids, batch_first=True, padding_value=0
-        ) 
+
+        input_ids = pad_sequence(input_ids, batch_first=True, padding_value=0)
         attention_mask = pad_sequence(attention_mask, batch_first=True, padding_value=0)
         labels = pad_sequence(labels, batch_first=True, padding_value=-100)
 
@@ -408,13 +410,19 @@ def fetch_loader_wnut(args):
 
     word_tokenizer = AutoTokenizer.from_pretrained(
         args.word_model, cache_dir=args.output_dir, add_prefix_space=True
-    ) 
+    )
     char_tokenizer = AutoTokenizer.from_pretrained(
         args.char_model, cache_dir=args.output_dir, add_prefix_space=True
     )
-    data_train = BookWikiDatasetMulti_efficient_eval(dataset_wnut["train"], char_tokenizer, word_tokenizer, args)
-    data_valid = BookWikiDatasetMulti_efficient_eval(dataset_wnut["validation"], char_tokenizer, word_tokenizer, args)
-    data_test = BookWikiDatasetMulti_efficient_eval(dataset_wnut["test"], char_tokenizer, word_tokenizer, args)
+    data_train = BookWikiDatasetMulti_efficient_eval(
+        dataset_wnut["train"], char_tokenizer, word_tokenizer, args
+    )
+    data_valid = BookWikiDatasetMulti_efficient_eval(
+        dataset_wnut["validation"], char_tokenizer, word_tokenizer, args
+    )
+    data_test = BookWikiDatasetMulti_efficient_eval(
+        dataset_wnut["test"], char_tokenizer, word_tokenizer, args
+    )
     loader_train = torch.utils.data.DataLoader(
         data_train,
         batch_size=args.train_batch_size,
@@ -457,8 +465,10 @@ def fetch_loader_book_wiki_bimodal(model_names, args, test):
     char_tokenizer = AutoTokenizer.from_pretrained(
         args.char_model, cache_dir=args.output_dir
     )
-    
-    data_train = BookWikiDatasetMulti_efficient(dataset_wiki["train"]["text"][:5], char_tokenizer, word_tokenizer, args)
+
+    data_train = BookWikiDatasetMulti_efficient(
+        dataset_wiki["train"]["text"][:5], char_tokenizer, word_tokenizer, args
+    )
     if args.test:
         loader_train = torch.utils.data.DataLoader(
             data_train,
@@ -491,7 +501,8 @@ class BookWikiDatasetMulti_efficient(Dataset):
         return tokenize_bimodal_efficient(
             self.text[idx], self.char_tokenizer, self.word_tokenizer, self.args
         )
-    
+
+
 class BookWikiDatasetMulti_efficient_eval(Dataset):
     def __init__(self, text, char_tokenizer, word_tokenizer, args):
         self.text = text
@@ -513,6 +524,7 @@ def clean_text(x):
         x = x.replace("<unk>", "")
         x = " ".join(x.split())
     return x
+
 
 def clean_tokenized_text(x_list):
     for i in range(len(x_list)):
@@ -576,16 +588,27 @@ def tokenize_bimodal(text, char_tokenizer, word_tokenizer, args):
             count += 1
             return None
 
+
 def tokenize_bimodal_efficient_eval(data, char_tokenizer, word_tokenizer, args, idx):
-    
+
     text = data["tokens"]
     text = clean_text(text)
-    char_tokenized = char_tokenizer(text, padding=True, truncation=True, is_split_into_words=True,)
-    word_tokenized = word_tokenizer(text, padding=True, truncation=True, is_split_into_words=True,)
+    char_tokenized = char_tokenizer(
+        text,
+        padding=True,
+        truncation=True,
+        is_split_into_words=True,
+    )
+    word_tokenized = word_tokenizer(
+        text,
+        padding=True,
+        truncation=True,
+        is_split_into_words=True,
+    )
     word_labels = encode_tag_each(data, word_tokenized, idx)
-    
-    word_tokenized['labels'] = word_labels
-    char_tokenized['labels'] = char_tokenized['token_type_ids']
+
+    word_tokenized["labels"] = word_labels
+    char_tokenized["labels"] = char_tokenized["token_type_ids"]
     return {
         "char": char_tokenized,
         "word": word_tokenized,
@@ -634,7 +657,7 @@ def tokenize_bimodal_efficient(text, char_tokenizer, word_tokenizer, args):
             char_ids = char_ids[:max_len]
             char_ids[-1] = -100
         char_ids = clean_tokenized_text(char_ids)
-        char_tokenized['input_ids'] = clean_tokenized_text(char_tokenized['input_ids'])
+        char_tokenized["input_ids"] = clean_tokenized_text(char_tokenized["input_ids"])
         if len(char_ids) == len(char_tokenized["input_ids"]):
             return {
                 "char": char_tokenized,

@@ -41,7 +41,7 @@ def encode_tags(examples, tokenized_inputs):
 
 def encode_tag_each(examples, tokenized_inputs, idx):
     label = examples["ner_tags"]
-    
+
     word_ids = tokenized_inputs.word_ids(
         batch_index=0
     )  # Map tokens to their respective word.
