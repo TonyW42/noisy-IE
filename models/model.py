@@ -6,7 +6,6 @@ import torch
 import transformers
 import numpy as np
 from utils.utils import *
-from data import *
 from utils.model_utils import *
 from torch import nn
 from collections import defaultdict
@@ -15,113 +14,16 @@ import typing
 from transformers import AutoModel
 import torch.nn.functional as F
 from datasets import load_metric
-
-id2tag = {
-    0: "O",
-    1: "B-corporation",
-    2: "I-corporation",
-    3: "B-creative-work",
-    4: "I-creative-work",
-    5: "B-group",
-    6: "I-group",
-    7: "B-location",
-    8: "I-location",
-    9: "B-person",
-    10: "I-person",
-    11: "B-product",
-    12: "I-product",
-}
-tag2id = {tag: id for id, tag in id2tag.items()}
-
-
-def encode_tags(examples, tokenized_inputs):
-    labels = []
-    for i, label in enumerate(examples[f"ner_tags"]):
-        word_ids = tokenized_inputs.word_ids(
-            batch_index=i
-        )  # Map tokens to their respective word.
-        previous_word_idx = None
-        label_ids = []
-        for word_idx in word_ids:  # Set the special tokens to -100.
-            if word_idx is None:
-                label_ids.append(-100)
-            elif (
-                word_idx != previous_word_idx
-            ):  # Only label the first token of a given word.
-                label_ids.append(label[word_idx])
-            else:
-                label_ids.append(-100)
-            previous_word_idx = word_idx
-        labels.append(label_ids)
-
-    return labels
-
-
-class WNUTDatasetMulti(torch.utils.data.Dataset):
-    def __init__(self, encodings, labels, model_names):
-        # inputs are as Lists of encodings, labels, and models names : []
-        self.encodings = encodings
-        self.labels = labels
-        self.model_names = model_names
-
-    def __getitem__(self, idx):
-        result = {}
-        for encoding, label, model_name in zip(
-            self.encodings, self.labels, self.model_names
-        ):
-            item = {key: torch.tensor(val[idx]) for key, val in encoding.items()}
-            item["labels"] = torch.tensor(label[idx])
-            result[model_name] = item
-        return result
-
-    def __len__(self):
-        return len(self.labels[0])
-
-
-## SST data for
-class SSTDatasetMulti(torch.utils.data.Dataset):
-    def __init__(self, encodings, model_names):
-        # inputs are as Lists of encodings, labels, and models names : []
-        self.encodings = encodings
-        self.model_names = model_names
-
-    def __getitem__(self, idx):
-        result = {}
-        for encoding, model_name in zip(self.encodings, self.model_names):
-            item = {key: torch.tensor(val[idx]) for key, val in encoding.items()}
-            item["labels"] = item["input_ids"]
-            result[model_name] = item
-        return result
-
-    def __len__(self):
-        return len(self.encodings[0]["input_ids"])  ## TODO HERE!
-
-
-class BookWikiDatasetMulti(torch.utils.data.Dataset):
-    def __init__(self, encodings, model_names):
-        # inputs are as Lists of encodings, labels, and models names : []
-        self.encodings = encodings
-        self.model_names = model_names
-
-    def __getitem__(self, idx):
-        # result = {}
-        # item = {
-        #     key: torch.tensor(val[idx]) for key, val in self.encodings["char"].items()
-        # }
-        # result["char"] = item
-        # item = {
-        #     key: torch.tensor(val[idx]) for key, val in self.encodings["word"].items()
-        # }
-        # result["word"] = item
-
-        """{
-            'char':  {'input_ids': [bs, seq_len, emb_size], 'att_mask': [bs, seq_len, emb_size]}
-        }
-        """
-        return self.encodings[idx]
-
-    def __len__(self):
-        return len(self.encodings)
+from models.dataset_preprocessing import (
+    WNUTDatasetMulti,
+    SSTDatasetMulti,
+    BookWikiDatasetMulti
+)
+from models.info import (
+    id2tag,
+    tag2id,
+    encode_tags 
+)
 
 
 ## need dataset/loader structure such as the following:

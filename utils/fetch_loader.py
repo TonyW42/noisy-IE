@@ -15,6 +15,7 @@ from models.model import (
     WNUTDatasetMulti,
     wnut_multiple_granularity,
 )
+from models.info import encode_tag_each
 from datasets import load_dataset
 import os
 import pickle
@@ -134,6 +135,35 @@ def custom_collate_book_wiki(data, seq_len=512, probability=0.15):
         return_dict[m_name]["input_ids"] = input_ids
         return_dict[m_name]["attention_mask"] = attention_mask
         return_dict["char_word_ids"] = char_word_id.clone().detach()
+
+    return return_dict
+
+
+def custom_collate_book_wiki_eval(data, seq_len=512, probability=0.15):
+    ### TODO: random mask by probability given
+    model_names = ["word", "char"]
+    batch_size = len(data)
+
+    return_dict = defaultdict(defaultdict)
+
+    for m_name in model_names:
+        input_ids = []
+        attention_mask = []
+        labels = []
+        for i in range(batch_size):
+            attention_mask.append(torch.tensor(data[i][m_name]["attention_mask"][:seq_len]))
+            input_ids.append(torch.tensor(data[i][m_name]["input_ids"][:seq_len]))
+            labels.append(torch.tensor(data[i][m_name]["labels"][:seq_len]))
+            
+        input_ids = pad_sequence(
+            input_ids, batch_first=True, padding_value=0
+        ) 
+        attention_mask = pad_sequence(attention_mask, batch_first=True, padding_value=0)
+        labels = pad_sequence(labels, batch_first=True, padding_value=-100)
+
+        return_dict[m_name]["input_ids"] = input_ids
+        return_dict[m_name]["attention_mask"] = attention_mask
+        return_dict[m_name]["labels"] = labels
 
     return return_dict
 
@@ -363,6 +393,46 @@ def fetch_loaders2(model_names, args):
     return loader_train, loader_valid, loader_test
 
 
+def fetch_loader_wnut(args):
+    """
+    To load dataset from bookcorpus and wikitext:
+    - Wikitext: ['wikitext-103-v1', 'wikitext-2-v1', 'wikitext-103-raw-v1', 'wikitext-2-raw-v1'];
+    - WikiText-2 aims to be of a similar size to the PTB while WikiText-103 contains all articles extracted from Wikipedia.
+    """
+
+    """
+    Store dataset in local to save time, 
+    if detected dataset is already downloaded, load from the disk
+    """
+    dataset_wnut = load_dataset("wnut_17", cache_dir=args.output_dir)
+
+    word_tokenizer = AutoTokenizer.from_pretrained(
+        args.word_model, cache_dir=args.output_dir, add_prefix_space=True
+    ) 
+    char_tokenizer = AutoTokenizer.from_pretrained(
+        args.char_model, cache_dir=args.output_dir, add_prefix_space=True
+    )
+    data_train = BookWikiDatasetMulti_efficient_eval(dataset_wnut["train"], char_tokenizer, word_tokenizer, args)
+    data_valid = BookWikiDatasetMulti_efficient_eval(dataset_wnut["validation"], char_tokenizer, word_tokenizer, args)
+    data_test = BookWikiDatasetMulti_efficient_eval(dataset_wnut["test"], char_tokenizer, word_tokenizer, args)
+    loader_train = torch.utils.data.DataLoader(
+        data_train,
+        batch_size=args.train_batch_size,
+        collate_fn=custom_collate_book_wiki_eval,
+    )
+    loader_valid = torch.utils.data.DataLoader(
+        data_valid,
+        batch_size=args.train_batch_size,
+        collate_fn=custom_collate_book_wiki_eval,
+    )
+    loader_test = torch.utils.data.DataLoader(
+        data_test,
+        batch_size=args.train_batch_size,
+        collate_fn=custom_collate_book_wiki_eval,
+    )
+    return loader_train, loader_valid, loader_test
+
+
 def fetch_loader_book_wiki_bimodal(model_names, args, test):
     """
     To load dataset from bookcorpus and wikitext:
@@ -374,13 +444,6 @@ def fetch_loader_book_wiki_bimodal(model_names, args, test):
     Store dataset in local to save time, 
     if detected dataset is already downloaded, load from the disk
     """
-    # if os.path.isfile("data/train_encoding_book_wiki.pickle"):
-    #     with open("data/train_encoding_book_wiki.pickle", "rb") as handle:
-    #         train_encoding_list = pickle.load(handle)
-    #     print(
-    #         "=================== Data Loaded from Local Data Folder ==================="
-    #     )
-    # else:
     dataset_bookcorpus = load_dataset("bookcorpus", cache_dir=args.output_dir)
     dataset_wiki = load_dataset(
         "wikitext", "wikitext-103-v1", cache_dir=args.output_dir
@@ -394,51 +457,7 @@ def fetch_loader_book_wiki_bimodal(model_names, args, test):
     char_tokenizer = AutoTokenizer.from_pretrained(
         args.char_model, cache_dir=args.output_dir
     )
-        # if test:
-        #     wiki_length = len(dataset_wiki["train"]["text"])
-        #     for each_data in tqdm(
-        #         dataset_wiki["train"]["text"][: int(wiki_length / 100)]
-        #     ):
-        #         tokenized_pair = tokenize_bimodal(
-        #             each_data, char_tokenizer, word_tokenizer, args
-        #         )
-        #         if tokenized_pair:
-        #             train_encoding_list.append(tokenized_pair)
-        #     bookcorpus_length = 0
-        #     # bookcorpus_length = len(dataset_bookcorpus["train"]["text"])
-        #     # for each_data in tqdm(dataset_bookcorpus["train"]["text"][:int(bookcorpus_length/25)]):
-        #     #     tokenized_pair = tokenize_bimodal(
-        #     #         each_data, char_tokenizer, word_tokenizer, args
-        #     #     )
-        #     #     if tokenized_pair:
-        #     #         train_encoding_list.append(tokenized_pair)
-        #     print(count)
-        #     print(100 * count / (wiki_length + bookcorpus_length))
-        # else:
-        #     wiki_length = len(dataset_wiki["train"]["text"])
-        #     for each_data in tqdm(dataset_wiki["train"]["text"]):
-        #         tokenized_pair = tokenize_bimodal(
-        #             each_data, char_tokenizer, word_tokenizer, args
-        #         )
-        #         if tokenized_pair:
-        #             train_encoding_list.append(tokenized_pair)
-
-        #     bookcorpus_length = len(dataset_bookcorpus["train"]["text"])
-        #     for each_data in tqdm(dataset_bookcorpus["train"]["text"]):
-        #         tokenized_pair = tokenize_bimodal(
-        #             each_data, char_tokenizer, word_tokenizer, args
-        #         )
-        #         if tokenized_pair:
-        #             train_encoding_list.append(tokenized_pair)
-        #     print(count)
-        #     print(count / (wiki_length + bookcorpus_length))
-        # # store dataset
-        # with open("data/train_encoding_book_wiki.pickle", "wb") as handle:
-        #     pickle.dump(train_encoding_list, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
-        # print("=================== Data Loaded from HuggingFace ===================")
-
-    # data_train = BookWikiDatasetMulti(train_encoding_list, model_names)
+    
     data_train = BookWikiDatasetMulti_efficient(dataset_wiki["train"]["text"][:5], char_tokenizer, word_tokenizer, args)
     if args.test:
         loader_train = torch.utils.data.DataLoader(
@@ -472,12 +491,36 @@ class BookWikiDatasetMulti_efficient(Dataset):
         return tokenize_bimodal_efficient(
             self.text[idx], self.char_tokenizer, self.word_tokenizer, self.args
         )
+    
+class BookWikiDatasetMulti_efficient_eval(Dataset):
+    def __init__(self, text, char_tokenizer, word_tokenizer, args):
+        self.text = text
+        self.char_tokenizer = char_tokenizer
+        self.word_tokenizer = word_tokenizer
+        self.args = args
+
+    def __len__(self):
+        return len(self.text)
+
+    def __getitem__(self, idx):
+        return tokenize_bimodal_efficient_eval(
+            self.text[idx], self.char_tokenizer, self.word_tokenizer, self.args, idx
+        )
 
 
 def clean_text(x):
-    x = x.replace("<unk>", "")
-    x = " ".join(x.split())
+    if isinstance(x, str):
+        x = x.replace("<unk>", "")
+        x = " ".join(x.split())
     return x
+
+def clean_tokenized_text(x_list):
+    for i in range(len(x_list)):
+        if x_list[i] == 57344:
+            x_list[i] = 256
+        elif x_list[i] == 57345:
+            x_list[i] = 257
+    return x_list
 
 
 def tokenize_bimodal(text, char_tokenizer, word_tokenizer, args):
@@ -533,6 +576,21 @@ def tokenize_bimodal(text, char_tokenizer, word_tokenizer, args):
             count += 1
             return None
 
+def tokenize_bimodal_efficient_eval(data, char_tokenizer, word_tokenizer, args, idx):
+    
+    text = data["tokens"]
+    text = clean_text(text)
+    char_tokenized = char_tokenizer(text, padding=True, truncation=True, is_split_into_words=True,)
+    word_tokenized = word_tokenizer(text, padding=True, truncation=True, is_split_into_words=True,)
+    word_labels = encode_tag_each(data, word_tokenized, idx)
+    
+    word_tokenized['labels'] = word_labels
+    char_tokenized['labels'] = char_tokenized['token_type_ids']
+    return {
+        "char": char_tokenized,
+        "word": word_tokenized,
+    }
+
 
 def tokenize_bimodal_efficient(text, char_tokenizer, word_tokenizer, args):
     """
@@ -575,7 +633,8 @@ def tokenize_bimodal_efficient(text, char_tokenizer, word_tokenizer, args):
         if len(char_ids) > max_len:
             char_ids = char_ids[:max_len]
             char_ids[-1] = -100
-
+        char_ids = clean_tokenized_text(char_ids)
+        char_tokenized['input_ids'] = clean_tokenized_text(char_tokenized['input_ids'])
         if len(char_ids) == len(char_tokenized["input_ids"]):
             return {
                 "char": char_tokenized,
