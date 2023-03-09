@@ -1,3 +1,7 @@
+import sys
+
+sys.path.append("..")
+sys.path.append("../..")
 from torch.nn.utils.rnn import pad_sequence  # (1)
 from collections import defaultdict
 from transformers import (
@@ -9,165 +13,30 @@ from transformers import (
 )
 import torch
 from models.model import (
-    SSTDatasetMulti,
-    BookWikiDatasetMulti,
     encode_tags,
-    WNUTDatasetMulti,
     wnut_multiple_granularity,
 )
-from models.info import encode_tag_each
+from data.pre_processing.loader_helper import (
+    SSTDatasetMulti,
+    WNUTDatasetMulti,
+    SSTDatasetMulti,
+    BookWikiDatasetMulti,
+)
 from datasets import load_dataset
 import os
-import pickle
-from tqdm import tqdm
-
-from datasets import DatasetDict, Dataset
+from datasets import Dataset
+from data.pre_processing.collator import (
+    custom_collate,
+    custom_collate_SST,
+    custom_collate_book_wiki_eval,
+    custom_collate_book_wiki,
+)
+from data.efficient.collator_efficient import (
+    tokenize_bimodal_efficient_eval,
+    tokenize_bimodal_efficient,
+)
 
 count = 0
-
-
-def custom_collate(data, seq_len=512):  # (2)
-    model_names = list(data[0].keys())
-    batch_size = len(data)
-    input_ids = []
-    labels = []
-    attention_mask = []
-    for m_name in model_names:
-        for i in range(batch_size):
-            input_ids.append(data[i][m_name]["input_ids"][:seq_len])
-    for m_name in model_names:
-        for i in range(batch_size):
-            attention_mask.append(data[i][m_name]["attention_mask"][:seq_len])
-    for m_name in model_names:
-        for i in range(batch_size):
-            labels.append(data[i][m_name]["labels"][:seq_len])
-    input_ids = pad_sequence(input_ids, batch_first=True, padding_value=1)
-    labels = pad_sequence(labels, batch_first=True, padding_value=-100)
-    attention_mask = pad_sequence(attention_mask, batch_first=True, padding_value=0)
-
-    return_dict = defaultdict(defaultdict)
-    for i, m_name in enumerate(model_names):
-        return_dict[m_name]["input_ids"] = input_ids[
-            i * batch_size : (i + 1) * batch_size
-        ]
-        return_dict[m_name]["labels"] = labels[i * batch_size : (i + 1) * batch_size]
-        return_dict[m_name]["attention_mask"] = attention_mask[
-            i * batch_size : (i + 1) * batch_size
-        ]
-    return return_dict
-
-
-def custom_collate_SST(data, seq_len=512, probability=0.15):  # (2)
-    model_names = list(data[0].keys())
-    batch_size = len(data)
-    input_ids = []
-    labels = []
-    attention_mask = []
-    for m_name in model_names:
-        for i in range(batch_size):
-            input_ids.append(data[i][m_name]["input_ids"][:seq_len])
-    for m_name in model_names:
-        for i in range(batch_size):
-            attention_mask.append(data[i][m_name]["attention_mask"][:seq_len])
-    input_ids = pad_sequence(input_ids, batch_first=True, padding_value=1)
-    labels = input_ids.clone()
-    attention_mask = pad_sequence(attention_mask, batch_first=True, padding_value=0)
-
-    rand = torch.rand(input_ids.shape)
-    # where the random array is less than 0.15, we set true
-    mask_arr = rand < probability
-    mask_arr = mask_arr * (input_ids != -100)
-
-    selection = []
-
-    for i in range(input_ids.shape[0]):
-        selection.append(torch.flatten(mask_arr[i].nonzero()).tolist())
-
-    for i in range(input_ids.shape[0]):
-        labels[i, selection[i]] = -100
-
-    return_dict = defaultdict(defaultdict)
-    for i, m_name in enumerate(model_names):
-        return_dict[m_name]["input_ids"] = input_ids[
-            i * batch_size : (i + 1) * batch_size
-        ]
-        return_dict[m_name]["labels"] = labels[i * batch_size : (i + 1) * batch_size]
-        return_dict[m_name]["attention_mask"] = attention_mask[
-            i * batch_size : (i + 1) * batch_size
-        ]
-
-    return return_dict
-
-
-def custom_collate_book_wiki(data, seq_len=512, probability=0.15):
-    ### TODO: random mask by probability given
-    model_names = ["word", "char"]
-    batch_size = len(data)
-
-    return_dict = defaultdict(defaultdict)
-
-    for m_name in model_names:
-        input_ids = []
-        attention_mask = []
-        char_word_id = []
-        for i in range(batch_size):
-            attention_mask.append(
-                torch.tensor(data[i][m_name]["attention_mask"][:seq_len])
-            )
-            char_word_id.append(torch.tensor(data[i]["char_word_ids"][:seq_len]))
-            input_ids.append(torch.tensor(data[i][m_name]["input_ids"][:seq_len]))
-
-        input_ids = pad_sequence(
-            input_ids, batch_first=True, padding_value=0
-        )  # why pad_value = -100 doesn't work
-        attention_mask = pad_sequence(attention_mask, batch_first=True, padding_value=0)
-        char_word_id = pad_sequence(char_word_id, batch_first=True, padding_value=-100)
-
-        rand = torch.rand(input_ids.shape)
-        # where the random array is less than 0.15, we set true
-        mask_arr = rand < probability
-        mask_arr = mask_arr * (input_ids != 0)
-
-        selection = []
-        for i in range(input_ids.shape[0]):
-            selection.append(torch.flatten(mask_arr[i].nonzero()).tolist())
-        for i in range(input_ids.shape[0]):
-            input_ids[i, selection[i]] = 0
-
-        return_dict[m_name]["input_ids"] = input_ids
-        return_dict[m_name]["attention_mask"] = attention_mask
-        return_dict["char_word_ids"] = char_word_id.clone().detach()
-
-    return return_dict
-
-
-def custom_collate_book_wiki_eval(data, seq_len=512, probability=0.15):
-    ### TODO: random mask by probability given
-    model_names = ["word", "char"]
-    batch_size = len(data)
-
-    return_dict = defaultdict(defaultdict)
-
-    for m_name in model_names:
-        input_ids = []
-        attention_mask = []
-        labels = []
-        for i in range(batch_size):
-            attention_mask.append(
-                torch.tensor(data[i][m_name]["attention_mask"][:seq_len])
-            )
-            input_ids.append(torch.tensor(data[i][m_name]["input_ids"][:seq_len]))
-            labels.append(torch.tensor(data[i][m_name]["labels"][:seq_len]))
-
-        input_ids = pad_sequence(input_ids, batch_first=True, padding_value=0)
-        attention_mask = pad_sequence(attention_mask, batch_first=True, padding_value=0)
-        labels = pad_sequence(labels, batch_first=True, padding_value=-100)
-
-        return_dict[m_name]["input_ids"] = input_ids
-        return_dict[m_name]["attention_mask"] = attention_mask
-        return_dict[m_name]["labels"] = labels
-
-    return return_dict
 
 
 def fetch_loaders(model_names, args):
@@ -519,22 +388,6 @@ class BookWikiDatasetMulti_efficient_eval(Dataset):
         )
 
 
-def clean_text(x):
-    if isinstance(x, str):
-        x = x.replace("<unk>", "")
-        x = " ".join(x.split())
-    return x
-
-
-def clean_tokenized_text(x_list):
-    for i in range(len(x_list)):
-        if x_list[i] == 57344:
-            x_list[i] = 256
-        elif x_list[i] == 57345:
-            x_list[i] = 257
-    return x_list
-
-
 def tokenize_bimodal(text, char_tokenizer, word_tokenizer, args):
     """
     input:
@@ -587,86 +440,3 @@ def tokenize_bimodal(text, char_tokenizer, word_tokenizer, args):
         else:
             count += 1
             return None
-
-
-def tokenize_bimodal_efficient_eval(data, char_tokenizer, word_tokenizer, args, idx):
-
-    text = data["tokens"]
-    text = clean_text(text)
-    char_tokenized = char_tokenizer(
-        text,
-        padding=True,
-        truncation=True,
-        is_split_into_words=True,
-    )
-    word_tokenized = word_tokenizer(
-        text,
-        padding=True,
-        truncation=True,
-        is_split_into_words=True,
-    )
-    word_labels = encode_tag_each(data, word_tokenized, idx)
-
-    word_tokenized["labels"] = word_labels
-    char_tokenized["labels"] = char_tokenized["token_type_ids"]
-    return {
-        "char": char_tokenized,
-        "word": word_tokenized,
-    }
-
-
-def tokenize_bimodal_efficient(text, char_tokenizer, word_tokenizer, args):
-    """
-    input:
-        text: input text type: str
-        char_tokenizer: character tokenizer
-        word_tokenizer: word tokenizer
-    output:
-        result : dict {"word" : word_tokenized,
-                       "char" : char_tokenized,
-                       "char_ids" :  the #word the character belongs to. Same length as character input_ids
-                       }
-    """
-    ## NOTE: change padding type and custom collator
-    text = clean_text(text)
-    char_tokenized = char_tokenizer(text, padding=True, truncation=True)
-    word_tokenized = word_tokenizer(text, padding=True, truncation=True)
-    if len(text):
-        char_ids = []
-
-        char_list = char_tokenizer.tokenize(text)
-        word_list = word_tokenizer.tokenize(text)
-
-        if "xlm" in args.word_model:
-            char_list.insert(0, " ")
-
-        current_word_id = 0
-        for word in word_list:
-            char_ids.extend([current_word_id for i in range(len(word))])
-            current_word_id += 1
-        if "xlm" in args.word_model:
-            char_ids[0] = -100
-        else:
-            char_ids.insert(0, -100)
-        ## if not truncated, then there is [SEP] token. append -100
-        # if char_tokenized["input_ids"][-1] == char_tokenizer.sep_token_id:
-        char_ids.append(-100)  ## [CLS] and [SEP] token should not be aligned
-        max_len = char_tokenizer.model_max_length
-        ## if too long, truncate and set last one to -100
-        if len(char_ids) > max_len:
-            char_ids = char_ids[:max_len]
-            char_ids[-1] = -100
-        char_ids = clean_tokenized_text(char_ids)
-        char_tokenized["input_ids"] = clean_tokenized_text(char_tokenized["input_ids"])
-        if len(char_ids) == len(char_tokenized["input_ids"]):
-            return {
-                "char": char_tokenized,
-                "word": word_tokenized,
-                "char_word_ids": char_ids,
-            }
-    ## if not match then return empty set. Collator should padd empty set to max len
-    return {
-        "char": {key: torch.tensor([], dtype=torch.long) for key in char_tokenized},
-        "word": {key: torch.tensor([], dtype=torch.long) for key in word_tokenized},
-        "char_word_ids": torch.tensor([], dtype=torch.long),
-    }

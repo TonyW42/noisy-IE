@@ -1,3 +1,7 @@
+import sys
+
+sys.path.append("..")
+sys.path.append("../..")
 import torch
 import transformers
 from models.model import *

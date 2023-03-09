@@ -1,3 +1,7 @@
+import sys
+
+sys.path.append("..")
+sys.path.append("../..")
 import transformers
 from transformers import AutoModel, AutoTokenizer, DataCollatorForTokenClassification
 import torch
