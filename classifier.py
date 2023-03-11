@@ -433,7 +433,7 @@ def train_bimodal_MLM(args, test=False):
     ## TODO: get loaders
     model_names = args.model_list.split("|")
     trainloader, devloader, testloader = fetch_loader_book_wiki_bimodal(
-        model_names, args, test=test
+        model_names, args
     )
 
     # MLM_model, optimizer, trainloader = accelerator.prepare(MLM_model, optimizer, trainloader)
