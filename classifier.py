@@ -425,14 +425,6 @@ def train_bimodal_MLM(args, test=False):
 
     criterion = torch.nn.CrossEntropyLoss()
 
-    # criterion = torch.nn.CrossEntropyLoss().to(args.device) ## weight the loss if you wish
-    print(" ====== parameters? ========")
-    # for name, p in MLM_model.named_parameters():
-    #     print(name)
-    # params = [p for p in model.parameters()]
-    # for name in model.model_dict:
-    #   for p in model.model_dict[name].parameters():
-    #     params.append(p)
     ## NOTE: freeze parameters??
     optimizer = torch.optim.AdamW(
         MLM_model.parameters(), lr=args.lr, weight_decay=args.weight_decay
