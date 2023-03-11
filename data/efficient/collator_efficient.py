@@ -17,6 +17,7 @@ def clean_tokenized_text(x_list):
             x_list[i] = 257
     return x_list
 
+
 def tokenize_bimodal_efficient_eval(data, char_tokenizer, word_tokenizer, args, idx):
 
     text = data["tokens"]

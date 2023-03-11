@@ -34,8 +34,6 @@ def custom_collate(data, seq_len=512):  # (2)
     return return_dict
 
 
-
-
 def custom_collate_SST(data, seq_len=512, probability=0.15):  # (2)
     model_names = list(data[0].keys())
     batch_size = len(data)
