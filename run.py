@@ -1,3 +1,7 @@
+import sys
+
+sys.path.append("..")
+sys.path.append("../..")
 import transformers
 from transformers import AutoModel, AutoTokenizer, DataCollatorForTokenClassification
 import torch
@@ -105,7 +109,7 @@ if __name__ == "__main__":
     # args.model_names = [args.granularities_model[key] for key in args.granularities_model]
     args.model_names = args.model_list.split("|")
     # args.vocab_size = {'char': 1114112}
-    args.vocab_size = {'char': 60000}
+    args.vocab_size = {"char": 258}
 
     if not args.device:
         if torch.cuda.is_available():

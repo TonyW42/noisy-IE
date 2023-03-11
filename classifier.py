@@ -1,3 +1,7 @@
+import sys
+
+sys.path.append("..")
+sys.path.append("../..")
 import torch
 import transformers
 from models.model import *
@@ -13,6 +17,7 @@ import torch
 from models.model import bimodal_trainer
 from models.model import bimodal_base
 from utils.fetch_loader import (
+    fetch_loader_wnut,
     fetch_loaders,
     fetch_loaders2,
     fetch_loaders_SST,
@@ -468,4 +473,33 @@ def train_bimodal_MLM(args, test=False):
     MLM_classifier_.train(args, trainloader, testloader)  ## train MLM
 
     ## TODO: evaluate on WNUT 17 and other task
-    
+    #####################################################################
+    model = bimodal_ner(base=base, args=args).to(args.device)
+    optimizer = torch.optim.AdamW(
+        model.parameters(), lr=args.lr, weight_decay=args.weight_decay
+    )
+    trainloader, devloader, testloader = fetch_loader_wnut(args)
+    num_training_steps = args.n_epochs * len(trainloader)
+    scheduler = get_scheduler(
+        "linear",
+        optimizer=optimizer,
+        num_warmup_steps=0,
+        num_training_steps=num_training_steps,
+    )
+    logger = None  ## TODO: add logger to track progress
+
+    args.n_epochs = train_epochs
+    args.word_model = "word"
+    classifier = bimodal_classifier(
+        model=model,
+        cfg=args,
+        criterion=criterion,
+        optimizer=optimizer,
+        scheduler=scheduler,
+        device=args.device,
+        logger=logger,
+    )
+    if args.mode == "train":
+        classifier.train(args, trainloader, testloader)
+
+        # use functions from evaluate_utils to test model.
