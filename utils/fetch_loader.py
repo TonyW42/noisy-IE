@@ -35,6 +35,7 @@ from data.efficient.collator_efficient import (
     tokenize_bimodal_efficient_eval,
     tokenize_bimodal_efficient,
 )
+from torch.utils.data import RandomSampler
 
 count = 0
 
@@ -341,6 +342,7 @@ def fetch_loader_book_wiki_bimodal(model_names, args):
     loader_train = torch.utils.data.DataLoader(
         data_train,
         batch_size=args.train_batch_size,
+        sampler = RandomSampler(data_train),
         collate_fn=custom_collate_book_wiki,
     )
     return loader_train, None, None
