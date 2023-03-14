@@ -2,14 +2,8 @@ import sys
 
 sys.path.append("..")
 sys.path.append("../..")
-from torch.nn.utils.rnn import pad_sequence  # (1)
-from collections import defaultdict
 from transformers import (
-    AutoModel,
     AutoTokenizer,
-    DataCollatorForTokenClassification,
-    get_scheduler,
-    AutoModelForMaskedLM,
 )
 import torch
 from models.model import (
@@ -20,7 +14,6 @@ from data.pre_processing.loader_helper import (
     SSTDatasetMulti,
     WNUTDatasetMulti,
     SSTDatasetMulti,
-    BookWikiDatasetMulti,
 )
 from datasets import load_dataset
 import os
@@ -340,10 +333,16 @@ def fetch_loader_book_wiki_bimodal(model_names, args):
     data_train = BookWikiDatasetMulti_efficient(
         dataset_wiki["train"]["text"][:5000], char_tokenizer, word_tokenizer, args
     )
+
+    sampler = torch.utils.data.sampler.BatchSampler(
+        torch.utils.data.sampler.RandomSampler(data_train),
+        batch_size=10,
+        drop_last=False)
+    
     loader_train = torch.utils.data.DataLoader(
         data_train,
         batch_size=args.train_batch_size,
-        sampler = RandomSampler(data_train),
+        sampler = sampler,
         collate_fn=custom_collate_book_wiki,
     )
     return loader_train, None, None
