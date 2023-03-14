@@ -338,7 +338,7 @@ def fetch_loader_book_wiki_bimodal(model_names, args):
     )
 
     data_train = BookWikiDatasetMulti_efficient(
-        dataset_wiki["train"]["text"][:1000], char_tokenizer, word_tokenizer, args
+        dataset_wiki["train"]["text"][:5000], char_tokenizer, word_tokenizer, args
     )
     loader_train = torch.utils.data.DataLoader(
         data_train,
