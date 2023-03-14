@@ -32,6 +32,7 @@ from data.pre_processing.collator import (
     custom_collate_book_wiki,
 )
 from data.efficient.collator_efficient import (
+    clean_text,
     tokenize_bimodal_efficient_eval,
     tokenize_bimodal_efficient,
 )
@@ -337,7 +338,7 @@ def fetch_loader_book_wiki_bimodal(model_names, args):
     )
 
     data_train = BookWikiDatasetMulti_efficient(
-        dataset_wiki["train"]["text"], char_tokenizer, word_tokenizer, args
+        dataset_wiki["train"]["text"][:1000], char_tokenizer, word_tokenizer, args
     )
     loader_train = torch.utils.data.DataLoader(
         data_train,
@@ -361,9 +362,17 @@ class BookWikiDatasetMulti_efficient(Dataset):
         return len(self.text)
 
     def __getitem__(self, idx):
-        return tokenize_bimodal_efficient(
-            self.text[idx], self.char_tokenizer, self.word_tokenizer, self.args
-        )
+        if isinstance(idx, int):
+            return tokenize_bimodal_efficient(
+                self.text[idx], self.char_tokenizer, self.word_tokenizer, self.args
+            )
+        elif isinstance(idx, list):
+            return [
+                tokenize_bimodal_efficient(
+                    self.text[i], self.char_tokenizer, self.word_tokenizer, self.args
+                )
+                for i in idx
+            ]
 
 
 class BookWikiDatasetMulti_efficient_eval(Dataset):

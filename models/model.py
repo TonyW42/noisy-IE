@@ -14,6 +14,7 @@ import typing
 from transformers import AutoModel
 import torch.nn.functional as F
 from datasets import load_metric
+import evaluate
 
 from models.info import id2tag, tag2id, encode_tags
 
