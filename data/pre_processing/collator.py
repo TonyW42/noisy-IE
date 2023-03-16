@@ -76,6 +76,12 @@ def custom_collate_SST(data, seq_len=512, probability=0.15):  # (2)
     return return_dict
 
 
+def custom_collate_book_wiki_wrapper(data, seq_len=512, probability=0.15):
+    if isinstance(data[0], list):
+        return [custom_collate_book_wiki(d, seq_len, probability) for d in data]
+    else:
+        return custom_collate_book_wiki(data, seq_len, probability)
+
 def custom_collate_book_wiki(data, seq_len=512, probability=0.15):
     ### TODO: random mask by probability given
     model_names = ["word", "char"]

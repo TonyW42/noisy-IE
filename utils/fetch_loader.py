@@ -23,6 +23,7 @@ from data.pre_processing.collator import (
     custom_collate_SST,
     custom_collate_book_wiki_eval,
     custom_collate_book_wiki,
+    custom_collate_book_wiki_wrapper,
 )
 from data.efficient.collator_efficient import (
     clean_text,
@@ -331,19 +332,19 @@ def fetch_loader_book_wiki_bimodal(model_names, args):
     )
 
     data_train = BookWikiDatasetMulti_efficient(
-        dataset_wiki["train"]["text"][:5000], char_tokenizer, word_tokenizer, args
+        dataset_wiki["train"]["text"][:1000], char_tokenizer, word_tokenizer, args
     )
 
     sampler = torch.utils.data.sampler.BatchSampler(
         torch.utils.data.sampler.RandomSampler(data_train),
-        batch_size=10,
+        batch_size=2,
         drop_last=False)
     
     loader_train = torch.utils.data.DataLoader(
         data_train,
         batch_size=args.train_batch_size,
         sampler = sampler,
-        collate_fn=custom_collate_book_wiki,
+        collate_fn=custom_collate_book_wiki_wrapper,
     )
     return loader_train, None, None
 
