@@ -338,12 +338,13 @@ def fetch_loader_book_wiki_bimodal(model_names, args):
     sampler = torch.utils.data.sampler.BatchSampler(
         torch.utils.data.sampler.RandomSampler(data_train),
         batch_size=2,
-        drop_last=False)
-    
+        drop_last=False,
+    )
+
     loader_train = torch.utils.data.DataLoader(
         data_train,
         batch_size=args.train_batch_size,
-        sampler = sampler,
+        sampler=sampler,
         collate_fn=custom_collate_book_wiki_wrapper,
     )
     return loader_train, None, None

@@ -82,6 +82,7 @@ def custom_collate_book_wiki_wrapper(data, seq_len=512, probability=0.15):
     else:
         return custom_collate_book_wiki(data, seq_len, probability)
 
+
 def custom_collate_book_wiki(data, seq_len=512, probability=0.15):
     ### TODO: random mask by probability given
     model_names = ["word", "char"]
