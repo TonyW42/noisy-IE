@@ -1273,7 +1273,7 @@ class bimodal_base(nn.Module):
 
     def forward(self, data):
         char_data = data["char"]
-        word_data = data["word"]
+        word_data = data["word"] 
         char_encoded = self.model_dict["char"](
             input_ids=char_data["input_ids"].to(self.args.device),
             attention_mask=char_data["attention_mask"].to(self.args.device),
