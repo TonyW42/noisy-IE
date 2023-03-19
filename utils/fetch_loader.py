@@ -17,6 +17,7 @@ from data.pre_processing.loader_helper import (
 )
 from datasets import load_dataset
 import os
+
 # from datasets import Dataset
 from torch.utils.data import Dataset
 from data.pre_processing.collator import (
@@ -333,7 +334,10 @@ def fetch_loader_book_wiki_bimodal(model_names, args):
     )
 
     data_train = BookWikiDatasetMulti_efficient(
-        dataset_wiki["train"]["text"][:1000], char_tokenizer, word_tokenizer, args
+        dataset_wiki["train"]["text"] + dataset_bookcorpus["train"]["text"],
+        char_tokenizer,
+        word_tokenizer,
+        args,
     )
 
     loader_train = torch.utils.data.DataLoader(
