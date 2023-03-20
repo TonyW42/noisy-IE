@@ -28,6 +28,12 @@ import pickle
 import time
 from torch import nn
 
+from torch.distributed import rpc
+from torch.distributed.pipeline.sync import Pipe
+import tempfile 
+import torch.distributed as dist
+from torch.nn.parallel import DistributedDataParallel as DDP
+
 # from accelerate import Accelerator
 
 
@@ -403,6 +409,13 @@ def train_sequential_2(args):
     ## need to re-write the _eval() function for token classification.
 
 
+def setup(rank, world_size):
+    os.environ['MASTER_ADDR'] = 'localhost'
+    os.environ['MASTER_PORT'] = '12355'
+
+    # initialize the process group
+    dist.init_process_group("gloo", rank=rank, world_size=world_size)
+
 def train_bimodal_MLM(args, test=False):
     ## initialize model
     # accelerator = Accelerator()
@@ -416,12 +429,20 @@ def train_bimodal_MLM(args, test=False):
     )
 
     base = bimodal_base(model_dict=model_dict, args=args).to(args.device)
+    
+    ## prep for pipeline parallel 
+    setup(0, torch.cuda.device_count())
+
     if args.test:
         MLM_model = bimodal_pretrain(base=base, args=args).to(args.device)
     else:
         MLM_model = bimodal_pretrain(base=base, args=args)
-        MLM_model = nn.DataParallel(MLM_model)
-        MLM_model.to(args.device)
+        MLM_model.to(0 if args.device != "cpu" else args.device)
+        MLM_model = DDP(MLM_model, device_ids = [0 if args.device != "cpu" else args.device])
+        
+
+
+
 
     criterion = torch.nn.CrossEntropyLoss()
 
@@ -463,6 +484,9 @@ def train_bimodal_MLM(args, test=False):
         logger=logger,
     )
     MLM_classifier_.train(args, trainloader, testloader)  ## train MLM
+
+    ## NOTE: whether to destroy this process?
+    dist.destroy_process_group()
 
     ## TODO: evaluate on WNUT 17 and other task
     #####################################################################
