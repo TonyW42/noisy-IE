@@ -1192,12 +1192,85 @@ class sequential_classifier_2(BaseEstimator):
 
         return preds, ys
 
+class Multihead_Self_Attention(nn.Module):
+  def __init__(self, args):
+    super().__init__()
+
+    self.args = args
+    self.num_attention_heads = args.num_attention_heads
+    self.attention_head_size = int(args.emb_size / args.num_attention_heads)
+    self.all_head_size = self.num_attention_heads * self.attention_head_size
+
+    # initialize the linear transformation layers for key, value, query
+    self.query = nn.Linear(args.emb_size, self.all_head_size)
+    self.key = nn.Linear(args.emb_size, self.all_head_size)
+    self.value = nn.Linear(args.emb_size, self.all_head_size)
+    # this attention is applied after calculating the attention score following the original implementation of transformer
+    # although it is a bit unusual, we empirically observe that it yields better performance
+    # self.dropout = nn.Dropout(args.attention_probs_dropout_prob)
+
+  def transform(self, x, linear_layer):
+    # the corresponding linear_layer of k, v, q are used to project the hidden_state (x)
+    bs, seq_len = x.shape[:2]
+    proj = linear_layer(x)
+    # next, we need to produce multiple heads for the proj 
+    # this is done by spliting the hidden state to self.num_attention_heads, each of size self.attention_head_size
+    proj = proj.view(bs, seq_len, self.num_attention_heads, self.attention_head_size)
+    # by proper transpose, we have proj of [bs, num_attention_heads, seq_len, attention_head_size]
+    proj = proj.transpose(1, 2)
+    return proj
+
+  def attention(self, key, query, value, attention_mask):
+    # each attention is calculated following eq (1) of https://arxiv.org/pdf/1706.03762.pdf
+    # attention scores are calculated by multiply query and key 
+    # and get back a score matrix S of [bs, num_attention_heads, seq_len, seq_len]
+    # S[*, i, j, k] represents the (unnormalized)attention score between the j-th and k-th token, given by i-th attention head
+    # before normalizing the scores, use the attention mask to mask out the padding token scores
+    # Note again: in the attention_mask non-padding tokens with 0 and padding tokens with a large negative number 
+    key_trans = key.transpose(2, 3)
+    mult = torch.matmul(query, key_trans)
+    div = mult / (key.shape[3]**0.5)
+    pre_soft = div + attention_mask
+    ### dropout pre_soft
+
+    # normalize the scores
+    softed = F.softmax(pre_soft, dim=3) ## which dimension??
+    ## dropout?? HERE!
+
+    # multiply the attention scores to the value and get back V' 
+    scores = torch.matmul(softed, value) 
+
+    # next, we need to concat multi-heads and recover the original shape [bs, seq_len, num_attention_heads * attention_head_size = hidden_size]
+    atten = scores.transpose(1, 2)
+    atten_size = atten.shape
+    new_shape = (atten_size[0], atten_size[1], atten_size[2] * atten_size[3])
+    atten = torch.reshape(atten, new_shape)
+    #raise NotImplementedError
+    return atten
+    #return 
+
+  def forward(self, query, key, value, attention_mask):
+    """
+    hidden_states: [bs, seq_len, hidden_state]
+    attention_mask: [bs, 1, 1, seq_len]
+    output: [bs, seq_len, hidden_state]
+    """
+    # first, we have to generate the key, value, query for each token for multi-head attention w/ transform (more details inside the function)
+    # of *_layers are of [bs, num_attention_heads, seq_len, attention_head_size]
+    key_layer = self.transform(key, self.key)
+    value_layer = self.transform(value, self.value)
+    query_layer = self.transform(query, self.query)
+    # calculate the multi-head attention 
+    attn_value = self.attention(key_layer, query_layer, value_layer, attention_mask)
+    return attn_value
+
+
 
 class BertLayer_bimodal(nn.Module):
     def __init__(self, emb_size, intermeidate_size=None, dropout_p=0.1, eps=1e-12):
         super().__init__()
         ## attention layer
-        self.self_attention = self_attention(emb_size=emb_size, dropout_p=dropout_p)
+        self.self_attention = Multihead_Self_Attention(args)
         self.attention_dense = nn.Linear(emb_size, emb_size)
         self.attention_layer_norm = nn.LayerNorm(emb_size, eps=eps)
         self.attention_dropout = nn.Dropout(p=dropout_p)
@@ -1217,9 +1290,10 @@ class BertLayer_bimodal(nn.Module):
         result = ln_layer(droped_out + inputs)
         return result
 
-    def forward(self, query, key, value):
+    def forward(self, query, key, value, attn_mask):
         ## attention
-        attention_out = self.self_attention(query=query, key=key, value=value)[
+        ## NOTE: changed to multihead self-attention 
+        attention_out = self.self_attention(query=query, key=key, value=value, attention_mask = attn_mask)[
             "attn_output"
         ]
         ## add-norm
@@ -1252,10 +1326,11 @@ class co_attention(nn.Module):
         self.cotrm = BertLayer_bimodal(emb_size=emb_size)
         self.trm = BertLayer_bimodal(emb_size=emb_size)
 
-    def forward(self, mod1, mod2):
-        co_trm = self.cotrm(query=mod1, key=mod2, value=mod2)
-        trm = self.trm(query=co_trm, key=co_trm, value=co_trm)
+    def forward(self, mod1, mod2, attn_mask):
+        co_trm = self.cotrm(query=mod1, key=mod2, value=mod2, attn_mask = attn_mask)
+        trm = self.trm(query=co_trm, key=co_trm, value=co_trm, attn_mask = attn_mask)
         return trm
+
 
 
 class bimodal_base(nn.Module):
@@ -1285,8 +1360,14 @@ class bimodal_base(nn.Module):
         word_hidden = word_encoded["last_hidden_state"]
         for i in range(self.args.num_att_layers):
             # print(f"-------------- {i} --------------")
-            char_new = self.char_co_attention[i](mod1=char_hidden, mod2=word_hidden)
-            word_new = self.word_co_attention[i](mod1=word_hidden, mod2=char_hidden)
+            char_new = self.char_co_attention[i](
+                       mod1=char_hidden, mod2=word_hidden,
+                       attn_mask = torch.unsqueeze(torch.unsqueeze(word_data["attention_mask"], 1), 2).to(self.args.device)
+            )
+            word_new = self.word_co_attention[i](
+                       mod1=word_hidden, mod2=char_hidden,
+                       attn_mask = torch.unsqueeze(torch.unsqueeze(char_data["attention_mask"], 1), 2).to(self.args.device)
+            )
             char_hidden = char_new
             word_hidden = word_new
             # print(f"============== {i} ==============")

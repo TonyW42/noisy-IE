@@ -73,6 +73,7 @@ if __name__ == "__main__":
     parser.add_argument("--emb_size", type=int, default=768)
     parser.add_argument("--char_model", type=str, default="google/canine-s")
     parser.add_argument("--n_workers", type=int, default=8)
+    parser.add_argument("--num_attention_heads", type=int, default=8)
 
     parser.add_argument(
         "--granularities_model",
