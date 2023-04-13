@@ -1275,12 +1275,12 @@ class bimodal_base(nn.Module):
         char_data = data["char"]
         word_data = data["word"]
         char_encoded = self.model_dict["char"](
-            input_ids=char_data["input_ids"].to(self.args.device),
-            attention_mask=char_data["attention_mask"].to(self.args.device),
+            input_ids=char_data["input_ids"],
+            attention_mask=char_data["attention_mask"],
         )
         word_encoded = self.model_dict["word"](
-            input_ids=word_data["input_ids"].to(self.args.device),
-            attention_mask=word_data["attention_mask"].to(self.args.device),
+            input_ids=word_data["input_ids"],
+            attention_mask=word_data["attention_mask"],
         )
         char_hidden = char_encoded["last_hidden_state"]
         word_hidden = word_encoded["last_hidden_state"]
@@ -1298,7 +1298,6 @@ class bimodal_pretrain(nn.Module):
     def __init__(self, base, args):
         super().__init__()
         args.char_vocab_size = args.vocab_size["char"]
-        # args.char_vocab_size = base.model_dict["char"].config.vocab_size
         args.word_vocab_size = base.model_dict["word"].config.vocab_size
         self.base = base
         self.char_mlm_layer = nn.Linear(args.emb_size, args.char_vocab_size)
@@ -1331,19 +1330,19 @@ class bimodal_trainer(BaseEstimator):
             torch.reshape(
                 logits_dict["char"], shape=(-1, logits_dict["char"].shape[-1])
             ),
-            data["char"]["input_ids"].view(-1).to(self.cfg.device),
-        ).to(self.cfg.device)
+            data["char"]["input_ids"].view(-1),
+        )
         # [10 * 44 * vocab_size] -> [(10*44) * vocab_size]
         word_mlm_loss = self.criterion(
             torch.reshape(
                 logits_dict["word"], shape=(-1, logits_dict["word"].shape[-1])
             ),
-            data["word"]["input_ids"].view(-1).to(self.cfg.device),
-        ).to(self.cfg.device)
+            data["word"]["input_ids"].view(-1),
+        )
         ## TODO: check dimension here
         alignment_loss = self.criterion(
-            logits_dict["similarity"], data["char_word_ids"].to(self.cfg.device)
-        ).to(self.cfg.device)
+            logits_dict["similarity"], data["char_word_ids"]
+        )
         ## TODO: weight loss
         loss = char_mlm_loss + word_mlm_loss + alignment_loss
         if self.mode == "train":
@@ -1356,13 +1355,6 @@ class bimodal_trainer(BaseEstimator):
             self.optimizer.zero_grad()
         elif self.mode in ("dev", "test"):
             pass
-        # for key, val in logits_dict.items():
-        #     logits_dict[key] = val.detach().cpu()
-        # logits_dict["similarity"] = logits_dict["similarity"].detach().cpu()
-        # for key, val in logits_dict["char"].items():
-        #             logits_dict["char"][key] = val.detach().cpu()
-        # for key, val in logits_dict["word"].items():
-        #             logits_dict["word"][key] = val.detach().cpu()
         return {
             "loss": loss.detach().cpu().item(),
             "char_mlm_loss": char_mlm_loss.detach().cpu().item(),
