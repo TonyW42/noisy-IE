@@ -85,8 +85,7 @@ def custom_collate_book_wiki(data, seq_len=512, probability=0.15):
     ### TODO: random mask by probability given
     model_names = ["word", "char"]
     batch_size = len(data)
-
-    return_dict = defaultdict(defaultdict)
+    return_dict = None
 
     for m_name in model_names:
         input_ids = []
@@ -116,9 +115,19 @@ def custom_collate_book_wiki(data, seq_len=512, probability=0.15):
         for i in range(input_ids.shape[0]):
             input_ids[i, selection[i]] = 0
 
-        return_dict[m_name]["input_ids"] = input_ids
-        return_dict[m_name]["attention_mask"] = attention_mask
-        return_dict["char_word_ids"] = char_word_id.clone().detach()
+        if return_dict is None:
+            return_dict = {
+                m_name: {"input_ids": input_ids, "attention_mask": attention_mask},
+                "char_word_ids": char_word_id.clone().detach(),
+            }
+        else:
+            return_dict[m_name] = {
+                "input_ids": input_ids,
+                "attention_mask": attention_mask,
+            }
+        # return_dict[m_name]["input_ids"] = input_ids
+        # return_dict[m_name]["attention_mask"] = attention_mask
+        # return_dict["char_word_ids"] = char_word_id.clone().detach()
 
     return return_dict
 
@@ -128,7 +137,7 @@ def custom_collate_book_wiki_eval(data, seq_len=512, probability=0.15):
     model_names = ["word", "char"]
     batch_size = len(data)
 
-    return_dict = defaultdict(defaultdict)
+    return_dict = None
 
     for m_name in model_names:
         input_ids = []
@@ -145,8 +154,23 @@ def custom_collate_book_wiki_eval(data, seq_len=512, probability=0.15):
         attention_mask = pad_sequence(attention_mask, batch_first=True, padding_value=0)
         labels = pad_sequence(labels, batch_first=True, padding_value=-100)
 
-        return_dict[m_name]["input_ids"] = input_ids
-        return_dict[m_name]["attention_mask"] = attention_mask
-        return_dict[m_name]["labels"] = labels
+        # return_dict[m_name]["input_ids"] = input_ids
+        # return_dict[m_name]["attention_mask"] = attention_mask
+        # return_dict[m_name]["labels"] = labels
+
+        if return_dict is None:
+            return_dict = {
+                m_name: {
+                    "input_ids": input_ids,
+                    "attention_mask": attention_mask,
+                    "labels": labels,
+                }
+            }
+        else:
+            return_dict[m_name] = {
+                "input_ids": input_ids,
+                "attention_mask": attention_mask,
+                "labels": labels,
+            }
 
     return return_dict

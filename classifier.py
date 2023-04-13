@@ -3,15 +3,11 @@ import sys
 sys.path.append("..")
 sys.path.append("../..")
 import torch
-import transformers
 from models.model import *
 import numpy as np
 from transformers import (
     AutoModel,
-    AutoTokenizer,
-    DataCollatorForTokenClassification,
     get_scheduler,
-    AutoModelForMaskedLM,
 )
 import torch
 from models.model import bimodal_trainer
@@ -24,11 +20,9 @@ from utils.fetch_loader import (
     fetch_loader_book_wiki,
     fetch_loader_book_wiki_bimodal,
 )
-import pickle
-import time
 from torch import nn
+from accelerate import Accelerator
 
-# from accelerate import Accelerator
 
 
 def train(args):
@@ -405,7 +399,7 @@ def train_sequential_2(args):
 
 def train_bimodal_MLM(args, test=False):
     ## initialize model
-    # accelerator = Accelerator()
+    accelerator = Accelerator()
 
     model_dict = torch.nn.ModuleDict()
     model_dict["char"] = AutoModel.from_pretrained(
@@ -415,13 +409,8 @@ def train_bimodal_MLM(args, test=False):
         args.word_model, cache_dir=args.output_dir
     )
 
-    base = bimodal_base(model_dict=model_dict, args=args).to(args.device)
-    if args.test:
-        MLM_model = bimodal_pretrain(base=base, args=args).to(args.device)
-    else:
-        MLM_model = bimodal_pretrain(base=base, args=args)
-        MLM_model = nn.DataParallel(MLM_model)
-        MLM_model.to(args.device)
+    base = bimodal_base(model_dict=model_dict, args=args)
+    MLM_model = bimodal_pretrain(base=base, args=args)
 
     criterion = torch.nn.CrossEntropyLoss()
 
@@ -462,6 +451,9 @@ def train_bimodal_MLM(args, test=False):
         device=args.device,
         logger=logger,
     )
+
+    MLM_classifier_, optimizer, trainloader = accelerator.prepare(MLM_classifier_, optimizer, trainloader)
+    args.accelerator = accelerator
     MLM_classifier_.train(args, trainloader, testloader)  ## train MLM
 
     ## TODO: evaluate on WNUT 17 and other task

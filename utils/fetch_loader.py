@@ -324,8 +324,6 @@ def fetch_loader_book_wiki_bimodal(model_names, args):
         "wikitext", "wikitext-103-v1", cache_dir=args.output_dir
     )
 
-    # train_encoding_list = []
-
     word_tokenizer = AutoTokenizer.from_pretrained(
         args.word_model, cache_dir=args.output_dir
     )  ## changed here
@@ -333,8 +331,14 @@ def fetch_loader_book_wiki_bimodal(model_names, args):
         args.char_model, cache_dir=args.output_dir
     )
 
+    char_tokenizer.unk_token_id = 256
+    char_tokenizer.cls_token_id = 257
+    char_tokenizer.sep_token_id = 258
+
+    data_full = dataset_wiki["train"]["text"] + dataset_bookcorpus["train"]["text"]
+
     data_train = BookWikiDatasetMulti_efficient(
-        dataset_wiki["train"]["text"] + dataset_bookcorpus["train"]["text"],
+        data_full[: len(data_full)],
         char_tokenizer,
         word_tokenizer,
         args,

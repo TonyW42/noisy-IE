@@ -2,30 +2,18 @@ import sys
 
 sys.path.append("..")
 sys.path.append("../..")
-import transformers
-from transformers import AutoModel, AutoTokenizer, DataCollatorForTokenClassification
 import torch
-from torch import nn, optim
-from datasets import load_dataset
-from sklearn.metrics import roc_auc_score, precision_recall_fscore_support
 
 import numpy as np
 import pandas as pd
-import random
 
 import os
 import argparse
-from datetime import datetime
 from classifier import *
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
 
-# from model import my_model
-# from utils import classifier, setup_seed, make_if_not_exists
-# from data import prepare_data
-from torch.utils.data import DataLoader
 from utils.utils import setup_seed
-from transformers import AutoModelForTokenClassification, TrainingArguments, Trainer
 from evaluate_utils import *
 
 ## use GPU is available
@@ -109,7 +97,7 @@ if __name__ == "__main__":
     # args.model_names = [args.granularities_model[key] for key in args.granularities_model]
     args.model_names = args.model_list.split("|")
     # args.vocab_size = {'char': 1114112}
-    args.vocab_size = {"char": 258}
+    args.vocab_size = {"char": 259}
 
     if not args.device:
         if torch.cuda.is_available():

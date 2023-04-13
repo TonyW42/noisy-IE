@@ -6,7 +6,6 @@ import datasets
 from datasets import load_dataset
 
 ### wnut dataset mapping
-from collections import defaultdict
 from datasets import DatasetDict, Dataset
 from transformers import AutoTokenizer
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler, random_split
