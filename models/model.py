@@ -1272,15 +1272,13 @@ class bimodal_base(nn.Module):
         )
 
     def forward(self, data):
-        char_data = data["char"]
-        word_data = data["word"]
         char_encoded = self.model_dict["char"](
-            input_ids=char_data["input_ids"],
-            attention_mask=char_data["attention_mask"],
+            input_ids=data["char_input_ids"].to(self.args.device),
+            attention_mask=data["char_attention_mask"].to(self.args.device),
         )
         word_encoded = self.model_dict["word"](
-            input_ids=word_data["input_ids"],
-            attention_mask=word_data["attention_mask"],
+            input_ids=data["word_input_ids"].to(self.args.device),
+            attention_mask=data["word_attention_mask"].to(self.args.device),
         )
         char_hidden = char_encoded["last_hidden_state"]
         word_hidden = word_encoded["last_hidden_state"]
@@ -1330,18 +1328,18 @@ class bimodal_trainer(BaseEstimator):
             torch.reshape(
                 logits_dict["char"], shape=(-1, logits_dict["char"].shape[-1])
             ),
-            data["char"]["input_ids"].view(-1),
+            data["char_input_ids"].view(-1).to(self.cfg.device),
         )
         # [10 * 44 * vocab_size] -> [(10*44) * vocab_size]
         word_mlm_loss = self.criterion(
             torch.reshape(
                 logits_dict["word"], shape=(-1, logits_dict["word"].shape[-1])
             ),
-            data["word"]["input_ids"].view(-1),
+            data["word_input_ids"].view(-1).to(self.cfg.device),
         )
         ## TODO: check dimension here
         alignment_loss = self.criterion(
-            logits_dict["similarity"], data["char_word_ids"]
+            logits_dict["similarity"], data["char_word_ids"].to(self.cfg.device)
         )
         ## TODO: weight loss
         loss = char_mlm_loss + word_mlm_loss + alignment_loss

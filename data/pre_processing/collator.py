@@ -85,7 +85,7 @@ def custom_collate_book_wiki(data, seq_len=512, probability=0.15):
     ### TODO: random mask by probability given
     model_names = ["word", "char"]
     batch_size = len(data)
-    return_dict = None
+    return_dict = dict()
 
     for m_name in model_names:
         input_ids = []
@@ -93,10 +93,10 @@ def custom_collate_book_wiki(data, seq_len=512, probability=0.15):
         char_word_id = []
         for i in range(batch_size):
             attention_mask.append(
-                torch.tensor(data[i][m_name]["attention_mask"][:seq_len])
+                torch.tensor(data[i][f"{m_name}_attention_mask"][:seq_len])
             )
             char_word_id.append(torch.tensor(data[i]["char_word_ids"][:seq_len]))
-            input_ids.append(torch.tensor(data[i][m_name]["input_ids"][:seq_len]))
+            input_ids.append(torch.tensor(data[i][f"{m_name}_input_ids"][:seq_len]))
 
         input_ids = pad_sequence(
             input_ids, batch_first=True, padding_value=0
@@ -115,20 +115,9 @@ def custom_collate_book_wiki(data, seq_len=512, probability=0.15):
         for i in range(input_ids.shape[0]):
             input_ids[i, selection[i]] = 0
 
-        if return_dict is None:
-            return_dict = {
-                m_name: {"input_ids": input_ids, "attention_mask": attention_mask},
-                "char_word_ids": char_word_id.clone().detach(),
-            }
-        else:
-            return_dict[m_name] = {
-                "input_ids": input_ids,
-                "attention_mask": attention_mask,
-            }
-        # return_dict[m_name]["input_ids"] = input_ids
-        # return_dict[m_name]["attention_mask"] = attention_mask
-        # return_dict["char_word_ids"] = char_word_id.clone().detach()
-
+        return_dict['char_word_ids'] = char_word_id.clone().detach()
+        return_dict[f'{m_name}_input_ids'] = input_ids
+        return_dict[f'{m_name}_attention_mask'] = attention_mask
     return return_dict
 
 
@@ -137,7 +126,7 @@ def custom_collate_book_wiki_eval(data, seq_len=512, probability=0.15):
     model_names = ["word", "char"]
     batch_size = len(data)
 
-    return_dict = None
+    return_dict = dict()
 
     for m_name in model_names:
         input_ids = []
@@ -145,32 +134,18 @@ def custom_collate_book_wiki_eval(data, seq_len=512, probability=0.15):
         labels = []
         for i in range(batch_size):
             attention_mask.append(
-                torch.tensor(data[i][m_name]["attention_mask"][:seq_len])
+                torch.tensor(data[i][f"{m_name}_attention_mask"][:seq_len])
             )
-            input_ids.append(torch.tensor(data[i][m_name]["input_ids"][:seq_len]))
-            labels.append(torch.tensor(data[i][m_name]["labels"][:seq_len]))
+            labels.append(torch.tensor(data[i][f"{m_name}_labels"][:seq_len]))
+            input_ids.append(torch.tensor(data[i][f"{m_name}_input_ids"][:seq_len]))
+
 
         input_ids = pad_sequence(input_ids, batch_first=True, padding_value=0)
         attention_mask = pad_sequence(attention_mask, batch_first=True, padding_value=0)
         labels = pad_sequence(labels, batch_first=True, padding_value=-100)
 
-        # return_dict[m_name]["input_ids"] = input_ids
-        # return_dict[m_name]["attention_mask"] = attention_mask
-        # return_dict[m_name]["labels"] = labels
-
-        if return_dict is None:
-            return_dict = {
-                m_name: {
-                    "input_ids": input_ids,
-                    "attention_mask": attention_mask,
-                    "labels": labels,
-                }
-            }
-        else:
-            return_dict[m_name] = {
-                "input_ids": input_ids,
-                "attention_mask": attention_mask,
-                "labels": labels,
-            }
+        return_dict[f'{m_name}_labels'] = labels
+        return_dict[f'{m_name}_input_ids'] = input_ids
+        return_dict[f'{m_name}_attention_mask'] = attention_mask
 
     return return_dict

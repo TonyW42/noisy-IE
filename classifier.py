@@ -400,6 +400,8 @@ def train_sequential_2(args):
 def train_bimodal_MLM(args, test=False):
     ## initialize model
     accelerator = Accelerator()
+    device = accelerator.device
+    args.device = device
 
     model_dict = torch.nn.ModuleDict()
     model_dict["char"] = AutoModel.from_pretrained(
@@ -442,6 +444,8 @@ def train_bimodal_MLM(args, test=False):
     train_epochs = args.n_epochs
     args.n_epochs = args.mlm_epochs
     # args.accelerator = accelerator
+    MLM_model, optimizer, trainloader = accelerator.prepare(MLM_model, optimizer, trainloader)
+    args.accelerator = accelerator
     MLM_classifier_ = bimodal_trainer(
         model=MLM_model,
         cfg=args,
@@ -452,8 +456,7 @@ def train_bimodal_MLM(args, test=False):
         logger=logger,
     )
 
-    MLM_classifier_, optimizer, trainloader = accelerator.prepare(MLM_classifier_, optimizer, trainloader)
-    args.accelerator = accelerator
+    # MLM_classifier_, optimizer, trainloader = accelerator.prepare(MLM_classifier_, optimizer, trainloader)
     MLM_classifier_.train(args, trainloader, testloader)  ## train MLM
 
     ## TODO: evaluate on WNUT 17 and other task
