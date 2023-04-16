@@ -468,7 +468,6 @@ def train_bimodal_MLM(args, test=False):
 
     # MLM_classifier_, optimizer, trainloader = accelerator.prepare(MLM_classifier_, optimizer, trainloader)
     MLM_classifier_.train(args, trainloader, testloader)  ## train MLM
-    wandb.finish()
 
     MLM_classifier_.save(args.output_dir, "MLM_model", force=True)
 
