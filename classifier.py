@@ -21,8 +21,7 @@ from utils.fetch_loader import (
     fetch_loader_book_wiki_bimodal,
 )
 from torch import nn
-from accelerate import Accelerator
-
+from accelerate import Accelerator, DistributedDataParallelKwargs
 
 
 def train(args):
@@ -399,7 +398,8 @@ def train_sequential_2(args):
 
 def train_bimodal_MLM(args, test=False):
     ## initialize model
-    accelerator = Accelerator()
+    ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
+    accelerator = Accelerator(kwargs_handlers=[ddp_kwargs])
     device = accelerator.device
     args.device = device
 
