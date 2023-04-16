@@ -1324,6 +1324,7 @@ class bimodal_trainer(BaseEstimator):
         self.optimizer.zero_grad()
         logits_dict = self.model(data=data)
         ## TODO: check data structure
+        print("char_mlm_loss")
         print(torch.reshape(
                 logits_dict["char"], shape=(-1, logits_dict["char"].shape[-1])
             ),
@@ -1334,7 +1335,7 @@ class bimodal_trainer(BaseEstimator):
             ),
             data["char_input_ids"].view(-1).to(self.cfg.device),
         )
-
+        print("word_mlm_loss")
         print(torch.reshape(
                 logits_dict["word"], shape=(-1, logits_dict["word"].shape[-1])
             ),
@@ -1346,6 +1347,7 @@ class bimodal_trainer(BaseEstimator):
             ),
             data["word_input_ids"].view(-1).to(self.cfg.device),
         )
+        print("alignment_loss")
         print(logits_dict["similarity"], data["char_word_ids"].to(self.cfg.device))
         ## TODO: check dimension here
         alignment_loss = self.criterion(
