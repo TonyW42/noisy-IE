@@ -9,6 +9,7 @@ from transformers import (
     AutoModel,
     get_scheduler,
 )
+import wandb
 import torch
 from models.model import bimodal_trainer
 from models.model import bimodal_base
@@ -398,11 +399,19 @@ def train_sequential_2(args):
 
 def train_bimodal_MLM(args, test=False):
     ## initialize model
-
     ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
     accelerator = Accelerator(kwargs_handlers=[ddp_kwargs])
     device = accelerator.device
     args.device = device
+
+    wandb.init(
+        # Set the project where this run will be logged
+        project="bimodal-MLM",
+        # Track hyperparameters and run metadata
+        config={
+            "learning_rate": args.lr,
+            "MLM_epochs": args.mlm_epochs,
+    })
 
     model_dict = torch.nn.ModuleDict()
     model_dict["char"] = AutoModel.from_pretrained(
@@ -459,6 +468,7 @@ def train_bimodal_MLM(args, test=False):
 
     # MLM_classifier_, optimizer, trainloader = accelerator.prepare(MLM_classifier_, optimizer, trainloader)
     MLM_classifier_.train(args, trainloader, testloader)  ## train MLM
+    wandb.finish()
 
     MLM_classifier_.save(args.output_dir, "MLM_model", force=True)
 

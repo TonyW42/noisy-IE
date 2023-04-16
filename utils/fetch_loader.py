@@ -336,7 +336,7 @@ def fetch_loader_book_wiki_bimodal(model_names, args):
     char_tokenizer.sep_token_id = 258
 
     data_full = dataset_wiki["train"]["text"] + dataset_bookcorpus["train"]["text"]
-
+    
     data_train = BookWikiDatasetMulti_efficient(
         data_full[: len(data_full)],
         char_tokenizer,

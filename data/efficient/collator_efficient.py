@@ -1,4 +1,3 @@
-import torch
 from models.info import encode_tag_each
 
 
