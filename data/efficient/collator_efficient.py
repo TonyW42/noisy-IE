@@ -11,10 +11,14 @@ def clean_text(x):
 
 def clean_tokenized_text(x_list):
     for i in range(len(x_list)):
-        if x_list[i] == 57344:
-            x_list[i] = 256
-        elif x_list[i] == 57345:
+        if x_list[i] == 57344: # [CLS]
             x_list[i] = 257
+        elif x_list[i] == 57345: # [SEP]
+            x_list[i] = 258
+        # NOTE if x_list[i] not in ASCII (> 256):
+        # #     replace with UNK  (NOTE: need to set unk in CANINE TOKENIZER 256) 
+        elif x_list[i] > 256:
+            x_list[i] = 256
     return x_list
 
 

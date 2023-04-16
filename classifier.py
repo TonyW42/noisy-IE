@@ -399,8 +399,6 @@ def train_sequential_2(args):
 def train_bimodal_MLM(args, test=False):
     ## initialize model
 
-    torch.set_printoptions(profile="full")
-    
     ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
     accelerator = Accelerator(kwargs_handlers=[ddp_kwargs])
     device = accelerator.device
