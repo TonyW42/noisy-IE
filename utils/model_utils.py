@@ -151,27 +151,29 @@ class BaseEstimator(object):
         self.model.train()
         tbar = tqdm(trainloader, dynamic_ncols=True)
         for data in tbar:
-            ret_step = self.step(data)
-            loss = ret_step["loss"]
-            #########
-            if "label" in ret_step:
-                y = ret_step["label"]
-            # prob = ret_step
-            self.train_step += 1
-            tbar.set_description("train_loss - {:.4f}".format(loss))
+            # ret_step = self.step(data)
+            # loss = ret_step["loss"]
+            # #########
+            # if "label" in ret_step:
+            #     y = ret_step["label"]
+            # # prob = ret_step
+            # self.train_step += 1
+            # tbar.set_description("train_loss - {:.4f}".format(loss))
 
-            # try:
-            #     ret_step = self.step(data)
-            #     loss = ret_step["loss"]
-            #     #########
-            #     if "label" in ret_step:
-            #         y = ret_step["label"]
-            #     # prob = ret_step
-            #     self.train_step += 1
-            #     tbar.set_description("train_loss - {:.4f}".format(loss))
-            # except Exception as e:
-            #     print(e)
-            #     tbar.set_description("train_loss - Unknown")
+            try:
+                ret_step = self.step(data)
+                loss = ret_step["loss"]
+                #########
+                if "label" in ret_step:
+                    y = ret_step["label"]
+                # prob = ret_step
+                self.train_step += 1
+                tbar.set_description("train_loss - {:.4f}".format(loss))
+            except Exception as e:
+                self.train_step += 1
+                print(e)
+                tbar.set_description("train_loss - Unknown")
+                
             if self.writer is not None:
                 self.writer.add_scalar("train/loss", loss, self.train_step)
                 self.writer.add_scalar(
