@@ -337,7 +337,7 @@ def fetch_loader_book_wiki_bimodal(model_names, args):
 
     data_full = dataset_wiki["train"]["text"] + dataset_bookcorpus["train"]["text"]
 
-    data_test = data_full[:len(data_full)/100]
+    data_test = data_full[:len(data_full)//100]
 
     data_train = BookWikiDatasetMulti_efficient(
         # data_full[: len(data_full)],
