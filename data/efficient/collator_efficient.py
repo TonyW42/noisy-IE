@@ -99,4 +99,4 @@ def tokenize_bimodal_efficient(text, char_tokenizer, word_tokenizer, args):
 
             return result
     ## if not match then return empty set. Collator should padd empty set to max len
-    return tokenize_bimodal_efficient("a", char_tokenizer, word_tokenizer, args)
+    return tokenize_bimodal_efficient("My heart is in the work.", char_tokenizer, word_tokenizer, args)
