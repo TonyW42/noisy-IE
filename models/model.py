@@ -1420,8 +1420,103 @@ class bimodal_ner(nn.Module):
         return logits
 
 
-class bimodal_classifier(baseline_classifier):
-    print("Bimodal classifier is the same as baseline classfier!")
+class bimodal_classifier(BaseEstimator):
+    def step(self, data):
+        self.optimizer.zero_grad()
+        logits = self.model(data=data)
+        ## softmax the logit before loss!
+        loss = self.criterion(
+            logits.view(-1, self.cfg.num_labels),
+            data["word_labels"].view(-1).to(self.cfg.device),
+        )
+        if self.mode == "train":
+            # loss = torch.tensor(0.00, requires_grad = True)
+            loss.backward()
+            self.optimizer.step()
+            if self.scheduler is not None:
+                self.scheduler.step()
+            self.optimizer.zero_grad()
+            return {
+                "loss": loss.detach().cpu().item(),
+                "logits": logits.detach().cpu(),  ## softmax this
+                "label": data["word_labels"],
+            }
+        elif self.mode in ("dev", "test"):
+            return {
+                "loss": loss.detach().cpu().item(),
+                "logits": logits.detach().cpu(),  ## softmax this
+                "label": data["word_labels"],
+            }
+
+    def _eval(self, evalloader):
+        self.model.eval()
+        tbar = tqdm(evalloader, dynamic_ncols=True)
+        eval_loss = []
+        ys = []
+        preds = []
+
+        if self.evaluate_metric is None:
+            self.evaluate_metric = dict()
+            self.evaluate_metric["f1"] = evaluate.load("f1")
+            self.evaluate_metric["all"] = load_metric("seqeval")
+
+        for data in tbar:
+            ret_step = self.step(data)  ## y: [bs, seq_len]
+            loss, logits, y = ret_step["loss"], ret_step["logits"], ret_step["label"]
+            pred = torch.argmax(logits, dim=-1)  ## predicted, [bs, seq_len]
+            if self.mode == "dev":
+                # tbar.set_description('dev_loss - {:.4f}'.format(loss))
+                # eval_loss.append(loss)
+                ys.append(y)
+            preds.append(pred)  ## use pred for F1 and change how you append
+       
+        if self.mode == "dev":
+            flatten_ys, flatten_pred = np.array([]), np.array([])
+            for y_ in ys:
+                flatten_ys = np.append(flatten_ys, np.array(y_).ravel())
+            for p_ in preds:
+                flatten_pred = np.append(flatten_pred, np.array(p_).ravel())
+
+            eval_ys, eval_pred = np.array([]), np.array([])
+            for y_, p_ in zip(flatten_ys, flatten_pred):
+                if y_ != -100:
+                    eval_ys = np.append(eval_ys, y_)
+                    eval_pred = np.append(eval_pred, p_)
+
+            results = self.evaluate_metric["f1"].compute(
+                predictions=eval_pred, references=eval_ys, average="macro"
+            )
+            print(f"====== F1 result: {results}======")
+
+            true_predictions = [
+                [
+                    id2tag[p]
+                    for (p, l) in zip(np.array(p_).ravel(), np.array(y_).ravel())
+                    if l != -100
+                ]
+                for p_, y_ in zip(preds, ys)
+            ]
+            true_labels = [
+                [
+                    id2tag[l]
+                    for (p, l) in zip(np.array(p_).ravel(), np.array(y_).ravel())
+                    if l != -100
+                ]
+                for p_, y_ in zip(preds, ys)
+            ]
+
+            result_ = self.evaluate_metric["all"].compute(
+                predictions=true_predictions,
+                references=true_labels,
+            )
+            wandb.log({"dev_f1": result_['overall_f1'], 
+                    "dev_loss": loss, 
+                    'dev_acc': result_['overall_accuracy'], 
+                    'dev_recall': result_['overall_recall'], 
+                    'dev_precision': result_['overall_precision']})
+            print(f"===== *F1 result: {result_['overall_f1']}======")
+
+        return eval_pred, eval_ys
 
 
 if __name__ == "__main__":
