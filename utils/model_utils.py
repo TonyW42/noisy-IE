@@ -269,7 +269,7 @@ class BaseEstimator(object):
         self.test_step += 1
         return results
 
-    def save(self, checkpoint_path, force=False):
+    def save(self, checkpoint_path):
         checkpoint = {
             "epoch": self.epoch,
             "train_step": self.train_step,
@@ -283,7 +283,7 @@ class BaseEstimator(object):
             if self.scheduler is not None
             else None,
         }
-        if force == True:
+        if self.args.force_save == True:
             torch.save(checkpoint, checkpoint_path)
         elif self.epoch % 20 == 0:
             torch.save(checkpoint, checkpoint_path)
