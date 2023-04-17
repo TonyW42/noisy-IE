@@ -283,7 +283,7 @@ class BaseEstimator(object):
             if self.scheduler is not None
             else None,
         }
-        if self.args.force_save == True:
+        if self.cfg.force_save == True:
             torch.save(checkpoint, checkpoint_path)
         elif self.epoch % 20 == 0:
             torch.save(checkpoint, checkpoint_path)
