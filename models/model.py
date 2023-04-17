@@ -872,6 +872,11 @@ class baseline_classifier(BaseEstimator):
                 references=true_labels,
             )
             # print(f"{result_}")
+            wandb.log({"dev_f1": result_['overall_f1'], 
+                    "dev_loss": loss, 
+                    'dev_acc': result_['overall_accuracy'], 
+                    'dev_recall': result_['overall_recall'], 
+                    'dev_precision': result_['overall_precision']})
             print(f"===== *F1 result: {result_['overall_f1']}======")
 
         return eval_pred, eval_ys

@@ -36,44 +36,17 @@ def tokenize_bimodal_efficient_eval(data, char_tokenizer, word_tokenizer, args, 
         truncation=True,
         is_split_into_words=True,
     )
-    char_ids = []
-
-    char_list = char_tokenizer.tokenize(text)
-    word_list = word_tokenizer.tokenize(text)
-
-    if "xlm" in args.word_model:
-        char_list.insert(0, " ")
-
-    current_word_id = 0
-    for word in word_list:
-        char_ids.extend([current_word_id for i in range(len(word))])
-        current_word_id += 1
-    if "xlm" in args.word_model:
-        char_ids[0] = -100
-    else:
-        char_ids.insert(0, -100)
-    ## if not truncated, then there is [SEP] token. append -100
-    # if char_tokenized["input_ids"][-1] == char_tokenizer.sep_token_id:
-    char_ids.append(-100)  ## [CLS] and [SEP] token should not be aligned
-    max_len = char_tokenizer.model_max_length
-    ## if too long, truncate and set last one to -100
-    if len(char_ids) > max_len:
-        char_ids = char_ids[:max_len]
-        char_ids[-1] = -100
-    char_ids = clean_tokenized_text(char_ids)
-    char_tokenized["input_ids"] = clean_tokenized_text(char_tokenized["input_ids"])
-    if len(char_ids) == len(char_tokenized["input_ids"]):
-        result = dict()
-        for key in char_tokenized:
-            result[f"char_{key}"] = char_tokenized[key]
-        for key in word_tokenized:
-            result[f"word_{key}"] = word_tokenized[key]
-        result["char_word_ids"] = char_ids
-
     word_labels = encode_tag_each(data, word_tokenized, idx)
 
+    char_tokenized["labels"] = char_tokenized["token_type_ids"]
+
+    result = dict()
+    for key in char_tokenized:
+        result[f"char_{key}"] = char_tokenized[key]
+    for key in word_tokenized:
+        result[f"word_{key}"] = word_tokenized[key]
     result["labels"] = word_labels
-    result["char_labels"] = char_tokenized["token_type_ids"]
+
     return result
 
 

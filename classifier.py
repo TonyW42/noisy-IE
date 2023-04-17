@@ -471,8 +471,21 @@ def train_bimodal_MLM(args, test=False):
 
     MLM_classifier_.save(os.path.join(args.output_dir, "MLM_model"), force=True)
 
+    wandb.finish()
+    
     ## TODO: evaluate on WNUT 17 and other task
     #####################################################################
+    wandb.init(
+        # Set the project where this run will be logged
+        project="wnut17",
+        # Track hyperparameters and run metadata
+        config={
+            "learning_rate": args.lr,
+            "n_epoch": args.n_epochs,
+            "batch_size": args.train_batch_size,
+    })
+
+
     model = bimodal_ner(base=base, args=args).to(args.device)
     optimizer = torch.optim.AdamW(
         model.parameters(), lr=args.lr, weight_decay=args.weight_decay
