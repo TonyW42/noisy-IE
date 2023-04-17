@@ -469,7 +469,7 @@ def train_bimodal_MLM(args, test=False):
     # MLM_classifier_, optimizer, trainloader = accelerator.prepare(MLM_classifier_, optimizer, trainloader)
     MLM_classifier_.train(args, trainloader, testloader)  ## train MLM
 
-    MLM_classifier_.save_model(os.path.join(args.output_dir, "MLM_model"), force=True)
+    MLM_classifier_.save(os.path.join(args.output_dir, "MLM_model"), force=True)
 
     ## TODO: evaluate on WNUT 17 and other task
     #####################################################################
