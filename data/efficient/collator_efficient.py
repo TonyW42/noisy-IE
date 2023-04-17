@@ -38,14 +38,15 @@ def tokenize_bimodal_efficient_eval(data, char_tokenizer, word_tokenizer, args, 
     )
     word_labels = encode_tag_each(data, word_tokenized, idx)
 
-    char_tokenized["labels"] = char_tokenized["token_type_ids"]
+    # char_tokenized["labels"] = char_tokenized["token_type_ids"]
 
     result = dict()
     for key in char_tokenized:
         result[f"char_{key}"] = char_tokenized[key]
     for key in word_tokenized:
         result[f"word_{key}"] = word_tokenized[key]
-    result["labels"] = word_labels
+    result["word_labels"] = word_labels
+    result["char_labels"] = char_tokenized["token_type_ids"]
 
     return result
 
