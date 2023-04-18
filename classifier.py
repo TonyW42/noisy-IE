@@ -475,6 +475,7 @@ def train_bimodal_MLM(args, test=False):
     
 def wnut_bimodal_MLM(args):
     ## TODO: evaluate on WNUT 17 and other task
+    args.device = "cuda:0" if args.device is not "cpu" else "cuda"
     #####################################################################
     wandb.init(
         # Set the project where this run will be logged
@@ -529,7 +530,6 @@ def wnut_bimodal_MLM(args):
         optimizer=optimizer,
         scheduler=scheduler,
         device=args.device,
-        logger=logger,
     )
     MLM_classifier_.load(os.path.join(args.output_dir, "MLM_model"))
 
