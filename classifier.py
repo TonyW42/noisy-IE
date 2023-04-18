@@ -558,6 +558,6 @@ def wnut_bimodal_MLM(args):
         logger=logger,
     )
     if args.mode == "train":
-        classifier.train(args, trainloader, testloader)
+        classifier.train(args, trainloader, devloader, testloader)
 
         # use functions from evaluate_utils to test model.

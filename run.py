@@ -122,7 +122,8 @@ if __name__ == "__main__":
     elif args.expr == "mlm_c":
         train_MLM_corpus(args)
     elif args.expr == "mlm_b":
-        # train_bimodal_MLM(args, args.test)
+        train_bimodal_MLM(args, args.test)
+    elif args.expr == "eval_wnut":
         wnut_bimodal_MLM(args)
     else:
         train(args)
