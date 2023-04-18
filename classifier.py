@@ -473,6 +473,7 @@ def train_bimodal_MLM(args, test=False):
 
     wandb.finish()
     
+def wnut_bimodal_MLM(args):
     ## TODO: evaluate on WNUT 17 and other task
     #####################################################################
     wandb.init(
@@ -485,6 +486,52 @@ def train_bimodal_MLM(args, test=False):
             "batch_size": args.train_batch_size,
     })
 
+    model_dict = torch.nn.ModuleDict()
+    model_dict["char"] = AutoModel.from_pretrained(
+        args.char_model, cache_dir=args.output_dir
+    )
+    model_dict["word"] = AutoModel.from_pretrained(
+        args.word_model, cache_dir=args.output_dir
+    )
+
+    base = bimodal_base(model_dict=model_dict, args=args)
+    MLM_model = bimodal_pretrain(base=base, args=args)
+
+    criterion = torch.nn.CrossEntropyLoss()
+
+    ## NOTE: freeze parameters??
+    optimizer = torch.optim.AdamW(
+        MLM_model.parameters(), lr=args.lr, weight_decay=args.weight_decay
+    )
+
+    ## TODO: get loaders
+    model_names = args.model_list.split("|")
+    trainloader, devloader, testloader = fetch_loader_book_wiki_bimodal(
+        model_names, args
+    )
+
+    # MLM_model, optimizer, trainloader = accelerator.prepare(MLM_model, optimizer, trainloader)
+    ## NOTE: structure of data
+    ## data : {"char":  char_data, "word": word_data}
+    ## char_data: what returned by char tokenizer + word_id_for_char
+    ## word_data: what returned by word tokenizer
+    num_training_steps = args.n_epochs * len(trainloader)
+    scheduler = get_scheduler(
+        "linear",
+        optimizer=optimizer,
+        num_warmup_steps=0,
+        num_training_steps=num_training_steps,
+    )
+    MLM_classifier_ = bimodal_trainer(
+        model=MLM_model,
+        cfg=args,
+        criterion=criterion,
+        optimizer=optimizer,
+        scheduler=scheduler,
+        device=args.device,
+        logger=logger,
+    )
+    MLM_classifier_.load(os.path.join(args.output_dir, "MLM_model"))
 
     model = bimodal_ner(base=base, args=args).to(args.device)
     optimizer = torch.optim.AdamW(
@@ -500,7 +547,6 @@ def train_bimodal_MLM(args, test=False):
     )
     logger = None  ## TODO: add logger to track progress
 
-    args.n_epochs = train_epochs
     args.word_model = "word"
     classifier = bimodal_classifier(
         model=model,
