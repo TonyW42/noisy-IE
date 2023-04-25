@@ -476,6 +476,7 @@ def train_bimodal_MLM(args, test=False):
     wandb.finish()
     
 def wnut_bimodal_MLM(args):
+    args.save = "false"
     ## TODO: evaluate on WNUT 17 and other task
     args.device = "cuda:0" if args.device is not "cpu" else "cuda"
     #####################################################################
@@ -533,7 +534,7 @@ def wnut_bimodal_MLM(args):
         scheduler=scheduler,
         device=args.device,
     )
-    MLM_classifier_.load(os.path.join(args.output_dir, "MLM_model.pt"))
+    # MLM_classifier_.load(os.path.join(args.output_dir, "MLM_model.pt"))
 
     model = bimodal_ner(base=base, args=args).to(args.device)
     optimizer = torch.optim.AdamW(
