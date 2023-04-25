@@ -564,3 +564,104 @@ def wnut_bimodal_MLM(args):
         classifier.train(args, trainloader, devloader, testloader)
 
         # use functions from evaluate_utils to test model.
+
+
+def train_bimodal_MLM_seq(args, test=False):
+    ## initialize model
+    args.save = "false"
+    ## TODO: evaluate on WNUT 17 and other task
+    # args.device = "cuda:0" if args.device is not "cpu" else "cuda"
+    args.device = "cpu"
+
+    model_dict = torch.nn.ModuleDict()
+    model_dict["char"] = AutoModel.from_pretrained(
+        args.char_model, cache_dir=args.output_dir
+    )
+    model_dict["word"] = AutoModel.from_pretrained(
+        args.word_model, cache_dir=args.output_dir
+    )
+
+    base = bimodal_base(model_dict=model_dict, args=args)
+    MLM_model = bimodal_pretrain(base=base, args=args)
+
+    criterion = torch.nn.CrossEntropyLoss()
+
+    ## NOTE: freeze parameters??
+    optimizer = torch.optim.AdamW(
+        MLM_model.parameters(), lr=args.lr, weight_decay=args.weight_decay
+    )
+
+    ## TODO: get loaders
+    model_names = args.model_list.split("|")
+    trainloader, devloader, testloader = fetch_loader_book_wiki_bimodal(
+        model_names, args
+    )
+
+    # MLM_model, optimizer, trainloader = accelerator.prepare(MLM_model, optimizer, trainloader)
+    ## NOTE: structure of data
+    ## data : {"char":  char_data, "word": word_data}
+    ## char_data: what returned by char tokenizer + word_id_for_char
+    ## word_data: what returned by word tokenizer
+    num_training_steps = args.n_epochs * len(trainloader)
+    scheduler = get_scheduler(
+        "linear",
+        optimizer=optimizer,
+        num_warmup_steps=0,
+        num_training_steps=num_training_steps,
+    )
+    logger = None  ## TODO: add logger to track progress
+
+    train_epochs = args.n_epochs
+    args.n_epochs = args.mlm_epochs
+    # args.accelerator = accelerator
+    MLM_classifier_ = bimodal_trainer(
+        model=MLM_model,
+        cfg=args,
+        criterion=criterion,
+        optimizer=optimizer,
+        scheduler=scheduler,
+        device=args.device,
+        logger=logger,
+    )
+
+    # MLM_classifier_, optimizer, trainloader = accelerator.prepare(MLM_classifier_, optimizer, trainloader)
+    MLM_classifier_.train(args, trainloader, testloader)  ## train MLM
+
+    wandb.init(
+        # Set the project where this run will be logged
+        project="wnut17",
+        # Track hyperparameters and run metadata
+        config={
+            "learning_rate": args.lr,
+            "n_epoch": args.n_epochs,
+            "batch_size": args.train_batch_size,
+    })
+
+    model = bimodal_ner(base=base, args=args).to(args.device)
+    optimizer = torch.optim.AdamW(
+        model.parameters(), lr=args.lr, weight_decay=args.weight_decay
+    )
+    trainloader, devloader, testloader = fetch_loader_wnut(args)
+    num_training_steps = args.n_epochs * len(trainloader)
+    scheduler = get_scheduler(
+        "linear",
+        optimizer=optimizer,
+        num_warmup_steps=0,
+        num_training_steps=num_training_steps,
+    )
+    logger = None  ## TODO: add logger to track progress
+
+    args.word_model = "word"
+    classifier = bimodal_classifier(
+        model=model,
+        cfg=args,
+        criterion=criterion,
+        optimizer=optimizer,
+        scheduler=scheduler,
+        device=args.device,
+        logger=logger,
+    )
+    if args.mode == "train":
+        classifier.train(args, trainloader, devloader, testloader)
+
+        # use functions from evaluate_utils to test model.

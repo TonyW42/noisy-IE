@@ -125,5 +125,7 @@ if __name__ == "__main__":
         train_bimodal_MLM(args, args.test)
     elif args.expr == "eval_wnut":
         wnut_bimodal_MLM(args)
+    elif args.expr == "mlm_ori":
+        train_bimodal_MLM_seq(args, args.test)
     else:
         train(args)
