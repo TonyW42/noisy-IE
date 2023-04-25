@@ -1,0 +1,43 @@
+{
+    "os": "macOS-13.3.1-arm64-arm-64bit",
+    "python": "3.10.7",
+    "heartbeatAt": "2023-04-25T05:18:53.772265",
+    "startedAt": "2023-04-25T05:18:53.343148",
+    "docker": null,
+    "cuda": null,
+    "args": [
+        "--expr",
+        "mlm_ori",
+        "--mlm_epochs",
+        "15",
+        "--n_epochs",
+        "50",
+        "--num_att_layers",
+        "1"
+    ],
+    "state": "running",
+    "program": "/Users/fuma/Documents/1.research/noisy-IE/run.py",
+    "codePath": "run.py",
+    "git": {
+        "remote": "https://github.com/TonyW42/noisy-IE.git",
+        "commit": "c0bb57d6f2b44df2b4cf2a86243e11ec8f5bf71a"
+    },
+    "email": "samaritanhu@gmail.com",
+    "root": "/Users/fuma/Documents/1.research/noisy-IE",
+    "host": "Xinyis-MBP-2.attlocal.net",
+    "username": "fuma",
+    "executable": "/opt/homebrew/opt/python@3.10/bin/python3.10",
+    "cpu_count": 8,
+    "cpu_count_logical": 8,
+    "disk": {
+        "total": 460.4317207336426,
+        "used": 8.45233154296875
+    },
+    "gpuapple": {
+        "type": "arm",
+        "vendor": "Apple"
+    },
+    "memory": {
+        "total": 32.0
+    }
+}

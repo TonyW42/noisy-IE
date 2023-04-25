@@ -197,7 +197,7 @@ class BaseEstimator(object):
                 cfg.output_dir, "{}.pt".format(datetime.now().strftime("%m-%d_%H-%M"))
             )
             if cfg.save.lower() == "true":
-                if self.epoch % 20 == 0 or self.step % 5000 == 0:
+                if self.epoch % 20 == 0 or self.train_step % 2500 == 0:
                     self.save(checkpoint_path)
             if self.logger is not None:
                 self.logger.info("[CHECKPOINT]\t{}".format(checkpoint_path))

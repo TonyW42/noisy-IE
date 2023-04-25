@@ -652,6 +652,7 @@ def train_bimodal_MLM_seq(args, test=False):
     logger = None  ## TODO: add logger to track progress
 
     args.word_model = "word"
+    args.n_epochs = train_epochs
     classifier = bimodal_classifier(
         model=model,
         cfg=args,

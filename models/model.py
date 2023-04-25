@@ -1350,11 +1350,11 @@ class bimodal_trainer(BaseEstimator):
         ## TODO: weight loss
         loss = char_mlm_loss + word_mlm_loss + alignment_loss
         
-        wandb.log({"char_mlm_loss": char_mlm_loss, 'word_mlm_loss': word_mlm_loss, 'alignment_loss': alignment_loss, 'loss': loss })
+        # wandb.log({"char_mlm_loss": char_mlm_loss, 'word_mlm_loss': word_mlm_loss, 'alignment_loss': alignment_loss, 'loss': loss })
 
         if self.mode == "train":
-            self.cfg.accelerator.backward(loss)
-            # loss.backward()
+            # self.cfg.accelerator.backward(loss)
+            loss.backward()
             self.optimizer.step()
             if self.scheduler is not None:
                 self.scheduler.step()
