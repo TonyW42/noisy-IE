@@ -281,7 +281,7 @@ class BaseEstimator(object):
         self.test_step = checkpoint["test_step"]
         new_state_dict = {}
         for k, v in checkpoint["model"].items():
-            name = k[7:] # remove `module.`
+            name = k[5:] # remove `base.`
             new_state_dict[name] = v
         self.model.load_state_dict(new_state_dict)
         if self.optimizer is not None:
