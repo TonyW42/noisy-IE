@@ -407,7 +407,6 @@ def train_bimodal_MLM(args, test=False):
     wandb.init(
         # distributed training experiments - Many processes needs group name
         group='bimodal-MLM',
-        mode="offline",
         # Set the project where this run will be logged
         project="bimodal-MLM",
         # Track hyperparameters and run metadata
