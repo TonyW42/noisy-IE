@@ -160,10 +160,11 @@ class BaseEstimator(object):
             self.train_step += 1
             tbar.set_description("train_loss - {:.4f}".format(loss))
 
-            if self.train_step % 2500 == 0:
+            if self.train_step % 5000 == 0:
+                # timestamp = "{}.pt".format(datetime.now().strftime("%m-%d_%H-%M")
                 self.save(os.path.join(
-                    self.cfg.output_dir, "{}.pt".format(datetime.now().strftime("%m-%d_%H-%M"))
-            ))
+                    self.cfg.output_dir, self.cfg.ckpt_name)
+            )
 
             if self.writer is not None:
                 self.writer.add_scalar("train/loss", loss, self.train_step)

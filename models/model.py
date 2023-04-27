@@ -1350,7 +1350,7 @@ class bimodal_trainer(BaseEstimator):
         ## TODO: weight loss
         loss = char_mlm_loss + word_mlm_loss + alignment_loss
         
-        # wandb.log({"char_mlm_loss": char_mlm_loss, 'word_mlm_loss': word_mlm_loss, 'alignment_loss': alignment_loss, 'loss': loss })
+        wandb.log({"char_mlm_loss": char_mlm_loss, 'word_mlm_loss': word_mlm_loss, 'alignment_loss': alignment_loss, 'loss': loss })
 
         if self.mode == "train":
             # self.cfg.accelerator.backward(loss)
@@ -1527,8 +1527,6 @@ class bimodal_classifier(BaseEstimator):
             checkpoint_path = os.path.join(
                 cfg.output_dir, "{}.pt".format(datetime.now().strftime("%m-%d_%H-%M"))
             )
-            if cfg.save.lower() == "true":
-                self.save(checkpoint_path)
             if self.logger is not None:
                 self.logger.info("[CHECKPOINT]\t{}".format(checkpoint_path))
         dev_f1_index = np.argmax(np.array(self.dev_f1))
