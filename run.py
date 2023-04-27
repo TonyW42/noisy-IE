@@ -91,6 +91,8 @@ if __name__ == "__main__":
         },
     )
 
+    parser.add_argument("--ckpt_name", type=str, default="MLM_model.pt")
+
     args = parser.parse_args()
     args.granularities = args.granularities.split(",")
     args.train = True if args.mode == "True" else False

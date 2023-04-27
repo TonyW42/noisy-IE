@@ -534,7 +534,7 @@ def wnut_bimodal_MLM(args):
         scheduler=scheduler,
         device=args.device,
     )
-    # MLM_classifier_.load(os.path.join(args.output_dir, "MLM_model.pt"))
+    MLM_classifier_.load(os.path.join(args.output_dir, args.ckpt_name))
 
     model = bimodal_ner(base=base, args=args).to(args.device)
     optimizer = torch.optim.AdamW(
