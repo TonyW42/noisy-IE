@@ -280,7 +280,7 @@ class BaseEstimator(object):
 
     def load(self, checkpoint_path):
         print("Loading checkpoint {}".format(checkpoint_path))
-        checkpoint = torch.load(checkpoint_path)
+        checkpoint = torch.load(checkpoint_path, map_location=self.cfg.device)
         self.epoch = checkpoint["epoch"]
         self.train_step = checkpoint["train_step"]
         self.dev_step = checkpoint["dev_step"]
