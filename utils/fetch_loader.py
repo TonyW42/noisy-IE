@@ -342,8 +342,8 @@ def fetch_loader_book_wiki_bimodal(model_names, args):
     # data_test = data_full[: 2000]
 
     data_train = BookWikiDatasetMulti_efficient(
-        # data_full[: len(data_full)],
-        data_test,
+        data_full[: len(data_full)],
+        # data_test,
         char_tokenizer,
         word_tokenizer,
         args,
