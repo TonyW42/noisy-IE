@@ -337,9 +337,9 @@ def fetch_loader_book_wiki_bimodal(model_names, args):
 
     data_full = dataset_wiki["train"]["text"] + dataset_bookcorpus["train"]["text"]
 
-    data_test = dataset_wiki["train"]["text"][: int(len(dataset_wiki["train"]["text"]) * 0.08)] + \
-        dataset_bookcorpus["train"]["text"][: int(len(dataset_bookcorpus["train"]["text"]) * 0.08)]
-    # data_test = data_full[: 2000]
+    # data_test = dataset_wiki["train"]["text"][: int(len(dataset_wiki["train"]["text"]) * 0.08)] + \
+    #     dataset_bookcorpus["train"]["text"][: int(len(dataset_bookcorpus["train"]["text"]) * 0.08)]
+    # data_test = data_full[: 500]
 
     data_train = BookWikiDatasetMulti_efficient(
         data_full[: len(data_full)],

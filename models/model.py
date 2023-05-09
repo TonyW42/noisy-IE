@@ -871,15 +871,61 @@ class baseline_classifier(BaseEstimator):
                 predictions=true_predictions,
                 references=true_labels,
             )
-            # print(f"{result_}")
-            wandb.log({"dev_f1": result_['overall_f1'], 
-                    "dev_loss": loss, 
-                    'dev_acc': result_['overall_accuracy'], 
-                    'dev_recall': result_['overall_recall'], 
-                    'dev_precision': result_['overall_precision']})
+            
             print(f"===== *F1 result: {result_['overall_f1']}======")
 
-        return eval_pred, eval_ys
+        return result_, loss
+
+    def _train_epoch(self, trainloader, devloader=None, testloader=None):
+        self.mode = "train"
+        self.model.train()
+        tbar = tqdm(trainloader, dynamic_ncols=True)
+        for data in tbar:
+            ret_step = self.step(data)
+            loss = ret_step["loss"]
+            #########
+            if "label" in ret_step:
+                y = ret_step["label"]
+            # prob = ret_step
+            self.train_step += 1
+            tbar.set_description("train_loss - {:.4f}".format(loss))
+        if devloader is not None:
+            print("========== dev set evaluation ==========")
+            dev_results, dev_loss = self.dev(devloader)
+        if testloader is not None:
+            print("========== test set evaluation ==========")
+            test_results, test_loss = self.dev(testloader)
+        
+        wandb.log({"dev_f1": dev_results['overall_f1'], 
+                "dev_loss": dev_loss, 
+                'dev_acc': dev_results['overall_accuracy'], 
+                'dev_recall': dev_results['overall_recall'], 
+                'dev_precision': dev_results['overall_precision'],
+                'test_f1': test_results['overall_f1'],
+                "test_loss": test_loss, 
+                'test_acc': test_results['overall_accuracy'], 
+                'test_recall': test_results['overall_recall'], 
+                'test_precision': test_results['overall_precision']})
+        self.dev_f1.append(dev_results['overall_f1'])
+        self.test_f1.append(test_results['overall_f1'])
+
+    def train(self, cfg, trainloader, devloader=None, testloader=None):
+        self.mode = "train"
+        self.dev_f1, self.test_f1 = [], []
+        assert self.optimizer is not None, "Optimizer is required"
+        assert hasattr(cfg, "output_dir"), "Output directory must be specified"
+        make_if_not_exists(cfg.output_dir)
+        for i in range(cfg.n_epochs):
+            print(f"Training epoch {i}")
+            self._train_epoch(trainloader, devloader, testloader)
+            self.epoch += 1
+            checkpoint_path = os.path.join(
+                cfg.output_dir, "{}.pt".format(datetime.now().strftime("%m-%d_%H-%M"))
+            )
+            if self.logger is not None:
+                self.logger.info("[CHECKPOINT]\t{}".format(checkpoint_path))
+        dev_f1_index = np.argmax(np.array(self.dev_f1))
+        print(f"Best dev - test F1: {self.test_f1[dev_f1_index]}")
 
 
 class self_attention(nn.Module):

@@ -22,7 +22,7 @@ from utils.fetch_loader import (
     fetch_loader_book_wiki_bimodal,
 )
 from torch import nn
-from accelerate import Accelerator, DistributedDataParallelKwargs
+# from accelerate import Accelerator, DistributedDataParallelKwargs
 
 
 def train(args):
@@ -255,8 +255,17 @@ def train_MLM_corpus(args):
 
         # use functions from evaluate_utils to test model.
 
-
 def train_baseline(args):
+    wandb.init(
+        # Set the project where this run will be logged
+        project="wnut17",
+        # Track hyperparameters and run metadata
+        config={
+            "learning_rate": args.lr,
+            "n_epoch": args.n_epochs,
+            "batch_size": args.train_batch_size,
+    })
+
     model = baseline_model(args=args).to(args.device)
     criterion = torch.nn.CrossEntropyLoss().to(args.device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
@@ -279,7 +288,7 @@ def train_baseline(args):
         logger=logger,
     )
     if args.mode == "train":
-        classifier.train(args, trainloader, testloader)
+        classifier.train(args, trainloader, devloader, testloader)
 
     if args.mode == "test":
         pass
@@ -505,7 +514,7 @@ def wnut_bimodal_MLM(args):
 
     ## NOTE: freeze parameters??
     optimizer = torch.optim.AdamW(
-        MLM_model.parameters(), lr=args.lr, weight_decay=args.weight_decay
+        [p for n, p in MLM_model.named_parameters() if 'model_dict' not in n], lr=args.lr, weight_decay=args.weight_decay
     )
 
     ## TODO: get loaders
@@ -567,6 +576,7 @@ def wnut_bimodal_MLM(args):
 
 
 def train_bimodal_MLM_seq(args, test=False):
+    print('here')
     ## initialize model
     args.save = "false"
     ## TODO: evaluate on WNUT 17 and other task
@@ -587,8 +597,9 @@ def train_bimodal_MLM_seq(args, test=False):
     criterion = torch.nn.CrossEntropyLoss()
 
     ## NOTE: freeze parameters??
+    print("=================parameters=================")
     optimizer = torch.optim.AdamW(
-        MLM_model.parameters(), lr=args.lr, weight_decay=args.weight_decay
+        [p for n, p in MLM_model.named_parameters() if 'model_dict' not in n], lr=args.lr, weight_decay=args.weight_decay
     )
 
     ## TODO: get loaders
@@ -627,15 +638,15 @@ def train_bimodal_MLM_seq(args, test=False):
     # MLM_classifier_, optimizer, trainloader = accelerator.prepare(MLM_classifier_, optimizer, trainloader)
     MLM_classifier_.train(args, trainloader, testloader)  ## train MLM
 
-    wandb.init(
-        # Set the project where this run will be logged
-        project="wnut17",
-        # Track hyperparameters and run metadata
-        config={
-            "learning_rate": args.lr,
-            "n_epoch": args.n_epochs,
-            "batch_size": args.train_batch_size,
-    })
+    # wandb.init(
+    #     # Set the project where this run will be logged
+    #     project="wnut17",
+    #     # Track hyperparameters and run metadata
+    #     config={
+    #         "learning_rate": args.lr,
+    #         "n_epoch": args.n_epochs,
+    #         "batch_size": args.train_batch_size,
+    # })
 
     model = bimodal_ner(base=base, args=args).to(args.device)
     optimizer = torch.optim.AdamW(
