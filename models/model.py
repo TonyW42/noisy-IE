@@ -1344,6 +1344,8 @@ class bimodal_base(nn.Module):
         self.word_co_attention = nn.ModuleList(
             [co_attention(args.emb_size) for i in range(args.num_att_layers)]
         )
+        self.char_lin = nn.Linear(args.emb_size * 2, args.emb_size)
+        self.word_lin = nn.Linear(args.emb_size * 2, args.emb_size)
 
     def forward(self, data):
         char_data = data["char"]
@@ -1371,6 +1373,9 @@ class bimodal_base(nn.Module):
             char_hidden = char_new
             word_hidden = word_new
             # print(f"============== {i} ==============")
+        if self.args.last_layer_integration == "true":
+            char_hidden = self.char_lin(torch.cat(char_hidden, char_encoded["last_hidden_state"], dim = -1))
+            word_hidden = self.word_lin(torch.cat(word_hidden, word_encoded["last_hidden_state"], dim = -1))
         return {"char": char_hidden, "word": word_hidden}
 
 
