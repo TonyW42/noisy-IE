@@ -71,6 +71,7 @@ if __name__ == "__main__":
             "subword_30k": "bert-base-cased",
         },
     )
+    parser.add_argument("--last_layer_integration", type=str, default="false")
 
     parser.add_argument("--test", type=bool, default=False)
     parser.add_argument(
