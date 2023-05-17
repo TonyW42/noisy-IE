@@ -1344,8 +1344,8 @@ class bimodal_base(nn.Module):
             word_hidden = word_new
             # print(f"============== {i} ==============")
         if self.args.last_layer_integration == "true":
-            char_hidden = self.char_lin(torch.cat(char_hidden, char_encoded["last_hidden_state"], dim = -1))
-            word_hidden = self.word_lin(torch.cat(word_hidden, word_encoded["last_hidden_state"], dim = -1))
+            char_hidden = self.char_lin(torch.cat((char_hidden, char_encoded["last_hidden_state"]), dim = -1))
+            word_hidden = self.word_lin(torch.cat((word_hidden, word_encoded["last_hidden_state"]), dim = -1))
         return {"char": char_hidden, "word": word_hidden}
 
 
