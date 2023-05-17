@@ -22,7 +22,7 @@ from utils.fetch_loader import (
     fetch_loader_book_wiki_bimodal,
 )
 from torch import nn
-# from accelerate import Accelerator, DistributedDataParallelKwargs
+from accelerate import Accelerator, DistributedDataParallelKwargs
 
 
 def train(args):
