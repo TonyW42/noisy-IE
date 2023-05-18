@@ -75,6 +75,8 @@ if __name__ == "__main__":
     parser.add_argument("--n_workers", type=int, default=8)
     parser.add_argument("--num_attention_heads", type=int, default=8)
     parser.add_argument("--last_layer_integration", type=str, default="false")
+    parser.add_argument("--add_positional_embedding", type=str, default="false")
+    parser.add_argument("--pos_type", type=str, default="none")
 
 
     parser.add_argument(
