@@ -293,10 +293,10 @@ class BaseEstimator(object):
             else:
                 new_state_dict[k] = v
         self.model.load_state_dict(new_state_dict)
-        if self.optimizer is not None:
-            self.optimizer.load_state_dict(checkpoint["optimizer"])
-        else:
-            print("Optimizer is not loaded")
+        # if self.optimizer is not None:
+        #     self.optimizer.load_state_dict(checkpoint["optimizer"])
+        # else:
+        #     print("Optimizer is not loaded")
         if self.scheduler is not None:
             self.scheduler.load_state_dict(checkpoint["scheduler"])
         else:
