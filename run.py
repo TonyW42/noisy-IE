@@ -64,6 +64,9 @@ if __name__ == "__main__":
     parser.add_argument("--group_name", type=str, default="default")
     parser.add_argument("--freeze_parameters", type=str, default="false")
 
+    parser.add_argument("--add_positional_embedding", type=str, default="false")
+    parser.add_argument("--pos_type", type=str, default="none")
+
     parser.add_argument(
         "--granularities_model",
         type=dict,

@@ -1311,6 +1311,56 @@ class co_attention(nn.Module):
         return trm
 
 
+def getPositionEncoding(seq_len, d, n=10000):
+    P = np.zeros((seq_len, d))
+    for k in range(seq_len):
+        for i in np.arange(int(d/2)):
+            denominator = np.power(n, 2*i/d)
+            P[k, 2*i] = np.sin(k/denominator)
+            P[k, 2*i+1] = np.cos(k/denominator)
+    return P
+
+def get_positional_embedding_A(word_positional_embedding, word_ids, args):
+    result = []
+    for ids in word_ids:
+        if ids != -100:
+            result.append(word_positional_embedding[ids])
+        else:
+            result.append([0 for i in range(args.emb_size)])
+    return result
+
+def get_positional_embedding_B(char_positional_embedding, word_ids, args):
+    ## NOTE: this requires further reasoning on correctness
+    result = []
+    current_id = -1
+    for i in range(word_ids):
+        ids = word_ids[i]
+        if ids != -100:
+            if ids != current_id:
+                result.append(char_positional_embedding[i])
+                current_id += 1
+        else:
+            result.append([0 for i in range(args.emb_size)])
+    return result
+
+def get_positional_embedding_C(char_positional_embedding, word_ids, args):
+    ## NOTE: this requires further reasoning on correctness
+    result = []
+    total = []
+    current_id = 0
+    for i in range(word_ids):
+        ids = word_ids[i]
+        if ids != -100:
+            if ids != current_id:
+                result.append(np.mean(np.tensor(total), dim = -1))
+                current_id += 1
+                total = []
+            total.append(char_positional_embedding[i])
+        else:
+            result.append([0 for i in range(args.emb_size)])
+    return result
+
+
 class bimodal_base(nn.Module):
     def __init__(self, model_dict, args):
         super().__init__()
@@ -1336,6 +1386,50 @@ class bimodal_base(nn.Module):
         )
         char_hidden = char_encoded["last_hidden_state"]
         word_hidden = word_encoded["last_hidden_state"]
+
+        if self.args.add_positional_embedding == "true":
+
+            if self.args.pos_type == "A":
+                word_positional_embedding = [
+                    getPositionEncoding(seq_len = int(word_hidden.shape[1]), d = self.args.emb_size) 
+                    for i in range(int(word_hidden.shape[0]))
+                    ]
+                word_positional_embedding = torch.tensor(word_positional_embedding)
+                char_positional_embedding = [
+                    get_positional_embedding_A(word_positional_embedding[i], data["char_word_ids"][i], self.args) 
+                    for i in range(int(char_hidden.shape[0]))
+                    ]
+                char_positional_embedding = torch.tensor(char_positional_embedding)
+
+            elif self.args.pos_type == "B":
+                char_positional_embedding = [
+                    getPositionEncoding(seq_len = int(char_hidden.shape[1]), d = self.args.emb_size) 
+                    for i in range(int(char_hidden.shape[0]))
+                    ]
+                char_positional_embedding = torch.tensor(char_positional_embedding)
+                word_positional_embedding = [
+                    get_positional_embedding_B(char_positional_embedding[i], data["char_word_ids"][i], self.args) 
+                    for i in range(int(word_hidden.shape[0]))
+                    ]
+                word_positional_embedding = torch.tensor(word_positional_embedding)
+
+            elif self.args.pos_type == "C":
+                char_positional_embedding = [
+                    getPositionEncoding(seq_len = int(char_hidden.shape[1]), d = self.args.emb_size) 
+                    for i in range(int(char_hidden.shape[0]))
+                    ]
+                char_positional_embedding = torch.tensor(char_positional_embedding)
+                word_positional_embedding = [
+                    get_positional_embedding_C(char_positional_embedding[i], data["char_word_ids"][i], self.args) 
+                    for i in range(int(word_hidden.shape[0]))
+                    ]
+                word_positional_embedding = torch.tensor(word_positional_embedding)
+
+
+
+            char_hidden = torch.add(char_hidden, char_positional_embedding)
+            word_hidden = torch.add(word_hidden, word_positional_embedding)
+
         for i in range(self.args.num_att_layers):
             # print(f"-------------- {i} --------------")
             char_new = self.char_co_attention[i](mod1=char_hidden, mod2=word_hidden)
@@ -1401,7 +1495,10 @@ class bimodal_trainer(BaseEstimator):
         ## TODO: weight loss
         loss = char_mlm_loss + word_mlm_loss + alignment_loss
         
-        wandb.log({"char_mlm_loss": char_mlm_loss, 'word_mlm_loss': word_mlm_loss, 'alignment_loss': alignment_loss, 'loss': loss })
+        try:
+            wandb.log({"char_mlm_loss": char_mlm_loss, 'word_mlm_loss': word_mlm_loss, 'alignment_loss': alignment_loss, 'loss': loss })
+        except:
+            print("wandb is not initialized")
 
         if self.mode == "train":
             # self.cfg.accelerator.backward(loss)

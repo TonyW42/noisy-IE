@@ -22,7 +22,10 @@ from utils.fetch_loader import (
     fetch_loader_book_wiki_bimodal,
 )
 from torch import nn
-from accelerate import Accelerator, DistributedDataParallelKwargs
+try:
+    from accelerate import Accelerator, DistributedDataParallelKwargs
+except:
+    print("accelerate not installed")
 
 
 def train(args):
