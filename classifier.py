@@ -441,9 +441,15 @@ def train_bimodal_MLM(args, test=False):
     criterion = torch.nn.CrossEntropyLoss()
 
     ## NOTE: freeze parameters??
-    optimizer = torch.optim.AdamW(
-        MLM_model.parameters(), lr=args.lr, weight_decay=args.weight_decay
-    )
+    # NOTE: freeze parameters??
+    if args.freeze_parameters == "true":
+        optimizer = torch.optim.AdamW(
+            [p for n, p in MLM_model.named_parameters() if 'model_dict' not in n], lr=args.lr, weight_decay=args.weight_decay
+        )
+    else:
+        optimizer = torch.optim.AdamW(
+            MLM_model.parameters(), lr=args.lr, weight_decay=args.weight_decay
+        )
 
     ## TODO: get loaders
     model_names = args.model_list.split("|")
@@ -516,14 +522,9 @@ def wnut_bimodal_MLM(args):
     criterion = torch.nn.CrossEntropyLoss()
 
     # NOTE: freeze parameters??
-    if args.freeze_parameters == "true":
-        optimizer = torch.optim.AdamW(
-            [p for n, p in MLM_model.named_parameters() if 'model_dict' not in n], lr=args.lr, weight_decay=args.weight_decay
-        )
-    else:
-        optimizer = torch.optim.AdamW(
-            MLM_model.parameters(), lr=args.lr, weight_decay=args.weight_decay
-        )
+    optimizer = torch.optim.AdamW(
+        MLM_model.parameters(), lr=args.lr, weight_decay=args.weight_decay
+    )
 
     ## TODO: get loaders
     model_names = args.model_list.split("|")
@@ -551,7 +552,7 @@ def wnut_bimodal_MLM(args):
         scheduler=scheduler,
         device=args.device,
     )
-    MLM_classifier_.load(os.path.join(args.output_dir, args.ckpt_name))
+    # MLM_classifier_.load(os.path.join(args.output_dir, args.ckpt_name))
 
     model = bimodal_ner(base=base, args=args).to(args.device)
     optimizer = torch.optim.AdamW(
