@@ -77,6 +77,7 @@ if __name__ == "__main__":
     parser.add_argument("--last_layer_integration", type=str, default="false")
     parser.add_argument("--add_positional_embedding", type=str, default="false")
     parser.add_argument("--pos_type", type=str, default="none")
+    parser.add_argument("--pos_class", type=str, default="fixed")
 
 
     parser.add_argument(

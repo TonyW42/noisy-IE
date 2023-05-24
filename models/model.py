@@ -1394,6 +1394,8 @@ class bimodal_base(nn.Module):
         self.char_lin = nn.Linear(args.emb_size * 2, args.emb_size)
         self.word_lin = nn.Linear(args.emb_size * 2, args.emb_size)
 
+        self.positional_embedding = nn.Embedding(num_embeddings = 3000, embedding_dim = args.emb_size)
+
     def forward(self, data):
         char_data = data["char"]
         word_data = data["word"]
@@ -1413,7 +1415,9 @@ class bimodal_base(nn.Module):
             if self.args.pos_type == "A":
                 word_positional_embedding = [
                     getPositionEncoding(seq_len = int(word_hidden.shape[1]), d = self.args.emb_size) 
-                    for i in range(int(word_hidden.shape[0]))
+                    if self.args.pos_class == "fixed" 
+                    else self.positional_embedding[i]
+                    for i in range(int(word_hidden.shape[0])) 
                     ]
                 word_positional_embedding = torch.tensor(word_positional_embedding)
                 char_positional_embedding = [
@@ -1425,6 +1429,8 @@ class bimodal_base(nn.Module):
             elif self.args.pos_type == "B":
                 char_positional_embedding = [
                     getPositionEncoding(seq_len = int(char_hidden.shape[1]), d = self.args.emb_size) 
+                    if self.args.pos_class == "fixed"
+                    else self.positional_embedding[i]
                     for i in range(int(char_hidden.shape[0]))
                     ]
                 char_positional_embedding = torch.tensor(char_positional_embedding)
@@ -1437,6 +1443,8 @@ class bimodal_base(nn.Module):
             elif self.args.pos_type == "C":
                 char_positional_embedding = [
                     getPositionEncoding(seq_len = int(char_hidden.shape[1]), d = self.args.emb_size) 
+                    if self.args.pos_class == "fixed"
+                    else self.positional_embedding[i]
                     for i in range(int(char_hidden.shape[0]))
                     ]
                 char_positional_embedding = torch.tensor(char_positional_embedding)
