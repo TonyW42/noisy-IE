@@ -1333,7 +1333,7 @@ def get_positional_embedding_B(char_positional_embedding, word_ids, args):
     ## NOTE: this requires further reasoning on correctness
     result = []
     current_id = -1
-    for i in range(word_ids):
+    for i in range(len(word_ids)):
         ids = word_ids[i]
         if ids != -100:
             if ids != current_id:
@@ -1348,7 +1348,7 @@ def get_positional_embedding_C(char_positional_embedding, word_ids, args):
     result = []
     total = []
     current_id = 0
-    for i in range(word_ids):
+    for i in range(len(word_ids)):
         ids = word_ids[i]
         if ids != -100:
             if ids != current_id:

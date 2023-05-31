@@ -19,6 +19,7 @@ from evaluate_utils import *
 ## use GPU is available
 
 from models.default_model import *
+from evaluate_classifier import *
 
 
 if __name__ == "__main__":
@@ -135,5 +136,7 @@ if __name__ == "__main__":
         wnut_bimodal_MLM(args)
     elif args.expr == "mlmori":
         train_bimodal_MLM_seq(args, args.test)
+    elif "tweeteval" in args.expr:
+        train_classification_model(args)
     else:
         train(args)
