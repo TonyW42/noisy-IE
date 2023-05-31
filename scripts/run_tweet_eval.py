@@ -18,8 +18,9 @@ dataset = [
 ]
 
 command_tweet = 'sbatch -p GPU-shared -t 8:00:00 -N 1 -n 1 -o eval_{dataset}_{num_att_layers}_ --gpus=v100-32:1 scripts/eval_script.sh {expr} {dataset} {num_labels} {num_att_layers}'
-for i in range(0, 2):
-    os.popen(command_tweet.format(dataset=dataset[i][0], 
-                                  num_att_layers=i, 
-                                  expr=dataset[i][0], 
-                                  num_labels=dataset[i][1]))
+for dataset_name, labels in dataset:
+    for att_layer_number in range(0,2):
+        os.popen(command_tweet.format(dataset=dataset_name, 
+                                      num_att_layers=att_layer_number, 
+                                      expr=dataset_name, 
+                                      num_labels=labels))
