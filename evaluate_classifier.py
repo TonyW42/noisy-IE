@@ -105,7 +105,7 @@ class classification_trainer(BaseEstimator):
             labels.extend(label.tolist())
             preds.extend(pred.tolist())
 
-        f1 = f1_metric.compute(predictions = preds, references = labels)
+        f1 = f1_metric.compute(predictions = preds, references = labels, average="macro")
         acc = acc_metric.compute(predictions = preds, references = labels)
         precision = precision_metric.compute(predictions = preds, references = labels)
         recall = recall_metric.compute(predictions = preds, references = labels)
