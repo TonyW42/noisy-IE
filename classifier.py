@@ -20,6 +20,7 @@ from utils.fetch_loader import (
     fetch_loaders_SST,
     fetch_loader_book_wiki,
     fetch_loader_book_wiki_bimodal,
+    fetch_loader_conll2003,
 )
 from torch import nn
 try:
@@ -500,7 +501,7 @@ def wnut_bimodal_MLM(args):
     #####################################################################
     wandb.init(
         # Set the project where this run will be logged
-        project="wnut17",
+        project="conll2003",
         # Track hyperparameters and run metadata
         config={
             "learning_rate": args.lr,
@@ -558,7 +559,7 @@ def wnut_bimodal_MLM(args):
     optimizer = torch.optim.AdamW(
         model.parameters(), lr=args.lr, weight_decay=args.weight_decay
     )
-    trainloader, devloader, testloader = fetch_loader_wnut(args)
+    trainloader, devloader, testloader = fetch_loader_conll2003(args)
     num_training_steps = args.n_epochs * len(trainloader)
     scheduler = get_scheduler(
         "linear",
