@@ -6,6 +6,7 @@ from transformers import AutoModel
 from models.model import *
 from transformers import AutoModel, AutoModel, AutoTokenizer, DataCollatorForTokenClassification, get_scheduler
 from torch.utils.data import RandomSampler, DataLoader, Dataset
+from datasets import load_dataset
 
 
 class classification_dataset(Dataset):
@@ -30,6 +31,8 @@ class classification_dataset(Dataset):
 
 def fetch_classification_loader(dataset_name, char_tokenizer, word_tokenizer):
     data = None ## TODO: add data 
+    if "tweeteval" in dataset_name:
+        data = load_dataset("tweet_eval", dataset_name.split("_")[-1])
     
     train_split = data["train"]
     val_split = data["validation"]
@@ -55,7 +58,9 @@ class model_for_classificaton(nn.Module):
     
     def forward(self, data):
         encoded = self.base_model(data)
-        cls_emb = encoded["pooler_output"]
+        cls_emb = encoded["word"][:, 0, :] ## NOTE: this works for Bimodal w/ Roberta, not roberta-base
+        ## if train roberta-base, should do sth like 
+        ## cls_emb = encoded["pooler_output"]
         logits = self.classificaton_head(cls_emb)
         return logits
         
