@@ -103,7 +103,7 @@ class classification_trainer(BaseEstimator):
             loss, logits, label = ret_step["loss"], ret_step["logits"], data["label"]
             pred = torch.argmax(logits, dim = -1)
             labels.extend(label.tolist())
-            preds.extend(pred.toist())
+            preds.extend(pred.tolist())
 
         f1 = f1_metric(predictions = preds, references = labels)
         acc = acc_metric(predictions = preds, references = labels)
