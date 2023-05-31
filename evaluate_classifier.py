@@ -106,9 +106,9 @@ class classification_trainer(BaseEstimator):
             preds.extend(pred.tolist())
 
         f1 = f1_metric.compute(predictions = preds, references = labels, average="macro")
-        acc = acc_metric.compute(predictions = preds, references = labels)
-        precision = precision_metric.compute(predictions = preds, references = labels)
-        recall = recall_metric.compute(predictions = preds, references = labels)
+        acc = acc_metric.compute(predictions = preds, references = labels, average="macro")
+        precision = precision_metric.compute(predictions = preds, references = labels, average="macro")
+        recall = recall_metric.compute(predictions = preds, references = labels, average="macro")
 
         # TODO: add these to W and B!
         print(f"Loss: {loss}, F1: {f1}, Acc: {acc}, Precision: {precision}, Recall: {recall}")
