@@ -117,7 +117,7 @@ class classification_trainer(BaseEstimator):
 def train_classification_model(args):
     wandb.init(
         # Set the project where this run will be logged
-        project=args.dataset_name,
+        project=args.dataset,
         # Track hyperparameters and run metadata
         config={
             "learning_rate": args.lr,

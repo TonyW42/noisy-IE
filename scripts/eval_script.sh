@@ -8,5 +8,5 @@ module load anaconda3
 conda activate py310
 # run the Unix 'echo' command
 mkdir -p /ocean/projects/cis230002p/xhu1/noisy-IE/mlm_b
-python3 run.py --expr eval_wnut --n_epochs 50 --num_att_layers $1 --test True --output_dir "/ocean/projects/cis230002p/xhu1/noisy-IE/mlm_b" > test-eval-${ds}-$1.log
+python3 run.py --expr tweeteval-emoji --num_labels 20 --n_epochs 50 --num_att_layers $1 --test True --output_dir "/ocean/projects/cis230002p/xhu1/noisy-IE/mlm_b" > test-eval-${ds}-$1.log
 echo "done"
