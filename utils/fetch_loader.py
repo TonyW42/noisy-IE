@@ -38,7 +38,7 @@ count = 0
 
 
 def fetch_loaders(model_names, args):
-    wnut = load_dataset("wnut_17", cache_dir=args.output_dir)
+    wnut = load_dataset("conll2003", cache_dir=args.output_dir)
     train_encoding_list, train_label_list = [], []
     valid_encoding_list, valid_label_list = [], []
     test_encoding_list, test_label_list = [], []

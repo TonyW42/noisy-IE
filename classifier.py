@@ -262,7 +262,7 @@ def train_MLM_corpus(args):
 def train_baseline(args):
     wandb.init(
         # Set the project where this run will be logged
-        project="wnut17",
+        project="conll2003",
         # Track hyperparameters and run metadata
         config={
             "learning_rate": args.lr,
