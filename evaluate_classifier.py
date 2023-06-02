@@ -23,11 +23,9 @@ class classification_dataset(Dataset):
         text = self.data[idx]["text"]
         result = dict()
         char_tokenized = self.char_tokenizer(text, 
-                                             padding='max_length', 
-                                             truncation=True)
+                                             padding='max_length')
         word_tokenized = self.word_tokenizer(text, 
-                                             padding='max_length', 
-                                             truncation=True)
+                                             padding='max_length')
         for key in char_tokenized:
             result[f"char_{key}"] = torch.tensor(char_tokenized[key])
         for key in word_tokenized:
@@ -48,9 +46,9 @@ def fetch_classification_loader(dataset_name, char_tokenizer, word_tokenizer, ar
     val_dataset = classification_dataset(val_split, char_tokenizer, word_tokenizer, args)
     test_dataset = classification_dataset(test_split, char_tokenizer, word_tokenizer, args)
 
-    train_loader = DataLoader(train_dataset, batch_size=args.train_batch_size)
-    val_loader = DataLoader(train_dataset, batch_size=args.train_batch_size)
-    test_loader = DataLoader(train_dataset, batch_size=args.train_batch_size)
+    train_loader = DataLoader(train_dataset, batch_size=args.train_batch_size, shuffle = True)
+    val_loader = DataLoader(train_dataset, batch_size=args.train_batch_size, shuffle = True)
+    test_loader = DataLoader(train_dataset, batch_size=args.train_batch_size, shuffle = True)
 
     return train_loader, val_loader, test_loader
 
@@ -64,12 +62,31 @@ class model_for_classificaton(nn.Module):
         self.classificaton_head = nn.Linear(args.emb_size, args.num_labels)
 
     def forward(self, data):
+        if self.args.model_type == "base":
+            return self.forward_base(data)
+        if self.args.model_type == "bimodal":
+            return self.forward_bimodal(data)
+    
+    def forward_base(self, data):
+        encoded = self.base_model(
+            input_ids = data["word_input_ids"].to(self.args.device),
+            attention_mask = data["word_attention_mask"].to(self.args.device)
+                                  )
+        cls_emb = encoded["last_hidden_state"][:, 0, :] ## NOTE: this works for Bimodal w/ Roberta, not roberta-base
+        ## if train roberta-base, should do sth like 
+        ## cls_emb = encoded["pooler_output"]
+        logits = self.classificaton_head(cls_emb)
+        return logits
+
+    def forward_bimodal(self, data):
         encoded = self.base_model(data)
         cls_emb = encoded["word"][:, 0, :] ## NOTE: this works for Bimodal w/ Roberta, not roberta-base
         ## if train roberta-base, should do sth like 
         ## cls_emb = encoded["pooler_output"]
         logits = self.classificaton_head(cls_emb)
         return logits
+
+
 
 
 class classification_trainer(BaseEstimator):
@@ -132,8 +149,12 @@ def train_classification_model(args):
     model_dict["word"] = AutoModel.from_pretrained(
         args.word_model, cache_dir=args.output_dir
     )
-
-    base = bimodal_base(model_dict=model_dict, args=args)
+    args.model_type = "base"
+    ## NOTE: change model type here
+    if args.model_type == "bimodal":
+        base = bimodal_base(model_dict=model_dict, args=args)
+    if args.model_type == "base":
+        base = model_dict["word"]
 
     model = model_for_classificaton(base_model = base, args = args)
     model = model.to(args.device)
@@ -169,7 +190,7 @@ def train_classification_model(args):
     logger = None  ## TODO: add logger to track progress
 
     train_epochs = args.n_epochs
-    args.n_epochs = args.mlm_epochs
+    # args.n_epochs = args.mlm_epochs
     # args.accelerator = accelerator
     classifier_ = classification_trainer(
         model=model,
