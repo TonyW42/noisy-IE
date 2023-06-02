@@ -60,6 +60,8 @@ class model_for_classificaton(nn.Module):
         self.base_model = base_model
         self.args = args
         self.classificaton_head = nn.Linear(args.emb_size, args.num_labels)
+        self.pooling_dense = nn.Linear(args.emb_size, args.emb_size)
+        self.pooling_act = nn.Tanh()
 
     def forward(self, data):
         if self.args.model_type == "base":
@@ -73,6 +75,7 @@ class model_for_classificaton(nn.Module):
             attention_mask = data["word_attention_mask"].to(self.args.device)
                                   )
         cls_emb = encoded["last_hidden_state"][:, 0, :] ## NOTE: this works for Bimodal w/ Roberta, not roberta-base
+        cls_emb = self.pooling(cls_emb)
         ## if train roberta-base, should do sth like 
         ## cls_emb = encoded["pooler_output"]
         logits = self.classificaton_head(cls_emb)
@@ -81,25 +84,20 @@ class model_for_classificaton(nn.Module):
     def forward_bimodal(self, data):
         encoded = self.base_model(data)
         cls_emb = encoded["word"][:, 0, :] ## NOTE: this works for Bimodal w/ Roberta, not roberta-base
+        cls_emb = self.pooling(cls_emb)
         ## if train roberta-base, should do sth like 
         ## cls_emb = encoded["pooler_output"]
         logits = self.classificaton_head(cls_emb)
         return logits
-
-
-class RobertaPooler(nn.Module):
-    def __init__(self, config):
-        super().__init__()
-        self.dense = nn.Linear(config.hidden_size, config.hidden_size)
-        self.activation = nn.Tanh()
-
-    def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
-        # We "pool" the model by simply taking the hidden state corresponding
-        # to the first token.
-        first_token_tensor = hidden_states[:, 0]
-        pooled_output = self.dense(first_token_tensor)
-        pooled_output = self.activation(pooled_output)
+    
+    def pooling(self, hidden_states):
+        pooled_output = self.pooling_dense(hidden_states)
+        pooled_output = self.pooling_act(pooled_output)
         return pooled_output
+
+
+
+
 
 
 
