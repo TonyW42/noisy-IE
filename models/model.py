@@ -1493,7 +1493,7 @@ class bimodal_trainer(BaseEstimator):
             logits_dict["similarity"], data["char_word_ids"].to(self.cfg.device)
         )
         ## TODO: weight loss
-        loss = char_mlm_loss + word_mlm_loss + alignment_loss
+        loss = char_mlm_loss + word_mlm_loss # + alignment_loss
         
         try:
             wandb.log({"char_mlm_loss": char_mlm_loss, 'word_mlm_loss': word_mlm_loss, 'alignment_loss': alignment_loss, 'loss': loss })
