@@ -105,6 +105,7 @@ class model_for_classificaton(nn.Module):
 
 class classification_trainer(BaseEstimator):
     def step(self, data):
+        self.optimizer.zero_grad()
         logits = self.model(data=data)
         loss = self.criterion(logits, data["label"].to(self.device))
         if self.mode == "train":
