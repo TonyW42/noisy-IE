@@ -164,7 +164,7 @@ def train_classification_model(args):
     model_dict["word"] = AutoModel.from_pretrained(
         args.word_model, cache_dir=args.output_dir
     )
-    args.model_type = "base"
+    args.model_type = "bimodal"
     ## NOTE: change model type here
     if args.model_type == "bimodal":
         base = bimodal_base(model_dict=model_dict, args=args)
