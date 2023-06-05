@@ -57,6 +57,7 @@ if __name__ == "__main__":
     parser.add_argument("--save", type=str, default="true")
     parser.add_argument("--layer_type", type=str, default="att")
     parser.add_argument("--mlm_epochs", type=int, default=100)
+    parser.add_argument("--model_type", type=str, default="base")
 
     ## NOTE: newly added
     parser.add_argument("--emb_size", type=int, default=768)
