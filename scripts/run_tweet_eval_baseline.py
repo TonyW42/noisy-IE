@@ -17,7 +17,7 @@ dataset = [
     ('tweeteval-stance_hillary', 3),
 ]
 
-command_baseline = 'sbatch -p GPU-shared -t 8:00:00 -N 1 -n 1 -o eval_{dataset}_base_ --gpus=v100-32:1 scripts/eval_script_baseline.sh {expr} {dataset} {num_labels} {num_att_layers}'
+command_baseline = 'sbatch -p GPU-shared -t 8:00:00 -N 1 -n 1 -o eval_{dataset}_base_ --gpus=v100-32:1 scripts/eval_script_baseline.sh {expr} {dataset} {num_labels}'
 
 
 for dataset_name, labels in dataset:
