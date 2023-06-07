@@ -29,14 +29,30 @@ class classification_dataset(Dataset):
         result["label"] = self.data[idx]["label"]
         return result
 
+def process_wnut_2020_task2(data_dir):
+    data = pd.read_csv(data_dir, header = None, sep = "\t", 
+                       names = ["id", "text", "label"])
+    result = []
+    for i in range(len(a)):
+        result_tmp = dict()
+        result_tmp["text"] = data["text"][i]
+        result["label_str"] = data["label"][i]
+        result.append(result_tmp)
+    return result
+
 def fetch_classification_loader(dataset_name, char_tokenizer, word_tokenizer):
     data = None ## TODO: add data 
     if "tweeteval" in dataset_name:
-        data = load_dataset("tweet_eval", dataset_name.split("_")[-1])
-    
-    train_split = data["train"]
-    val_split = data["validation"]
-    test_split = data["test"]
+        data = load_dataset("tweet_eval", dataset_name.split("_")[-1])   
+        train_split = data["train"]
+        val_split = data["validation"]
+        test_split = data["test"]
+    if dataset_name == "wnut20_task2":
+        ## NOTE: if error here just change the data_dir
+        train_split = process_wnut_2020_task2("data/wnut20_task2/train.tsv")
+        val_split = process_wnut_2020_task2("data/wnut20_task2/valid.tsv")
+        test_split = process_wnut_2020_task2("data/wnut20_task2/test.tsv")
+        
 
     train_dataset = classification_dataset(train_split, char_tokenizer, word_tokenizer, args)
     val_dataset = classification_dataset(val_split, char_tokenizer, word_tokenizer, args)
@@ -103,6 +119,8 @@ class classification_trainer(BaseEstimator):
         recall = recall_metric(predictions = preds, references = labels)
 
         # TODO: add these to W and B!
+
+
 
 def train_classification_model(args):
     model_dict = nn.ModuleDict()
