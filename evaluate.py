@@ -37,6 +37,7 @@ def process_wnut_2020_task2(data_dir):
         result_tmp = dict()
         result_tmp["text"] = data["text"][i]
         result["label_str"] = data["label"][i]
+        result["label"] = 0 if result["label_str"] == "UNINFORMATIVE" else 1
         result.append(result_tmp)
     return result
 
