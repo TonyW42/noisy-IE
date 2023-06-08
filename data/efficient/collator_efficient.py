@@ -1,4 +1,3 @@
-import torch
 from models.info import encode_tag_each
 
 
@@ -11,15 +10,18 @@ def clean_text(x):
 
 def clean_tokenized_text(x_list):
     for i in range(len(x_list)):
-        if x_list[i] == 57344:
-            x_list[i] = 256
-        elif x_list[i] == 57345:
+        if x_list[i] == 57344: # [CLS]
             x_list[i] = 257
+        elif x_list[i] == 57345: # [SEP]
+            x_list[i] = 258
+        # NOTE if x_list[i] not in ASCII (> 256):
+        # #     replace with UNK  (NOTE: need to set unk in CANINE TOKENIZER 256) 
+        elif x_list[i] > 256:
+            x_list[i] = 256
     return x_list
 
 
 def tokenize_bimodal_efficient_eval(data, char_tokenizer, word_tokenizer, args, idx):
-
     text = data["tokens"]
     text = clean_text(text)
     char_tokenized = char_tokenizer(
@@ -36,12 +38,17 @@ def tokenize_bimodal_efficient_eval(data, char_tokenizer, word_tokenizer, args, 
     )
     word_labels = encode_tag_each(data, word_tokenized, idx)
 
-    word_tokenized["labels"] = word_labels
-    char_tokenized["labels"] = char_tokenized["token_type_ids"]
-    return {
-        "char": char_tokenized,
-        "word": word_tokenized,
-    }
+    # char_tokenized["labels"] = char_tokenized["token_type_ids"]
+
+    result = dict()
+    for key in char_tokenized:
+        result[f"char_{key}"] = char_tokenized[key]
+    for key in word_tokenized:
+        result[f"word_{key}"] = word_tokenized[key]
+    result["word_labels"] = word_labels
+    result["char_labels"] = char_tokenized["token_type_ids"]
+
+    return result
 
 
 def tokenize_bimodal_efficient(text, char_tokenizer, word_tokenizer, args):
@@ -88,14 +95,13 @@ def tokenize_bimodal_efficient(text, char_tokenizer, word_tokenizer, args):
         char_ids = clean_tokenized_text(char_ids)
         char_tokenized["input_ids"] = clean_tokenized_text(char_tokenized["input_ids"])
         if len(char_ids) == len(char_tokenized["input_ids"]):
-            return {
-                "char": char_tokenized,
-                "word": word_tokenized,
-                "char_word_ids": char_ids,
-            }
+            result = dict()
+            for key in char_tokenized:
+                result[f"char_{key}"] = char_tokenized[key]
+            for key in word_tokenized:
+                result[f"word_{key}"] = word_tokenized[key]
+            result["char_word_ids"] = char_ids
+
+            return result
     ## if not match then return empty set. Collator should padd empty set to max len
-    return {
-        "char": {key: torch.tensor([], dtype=torch.long) for key in char_tokenized},
-        "word": {key: torch.tensor([], dtype=torch.long) for key in word_tokenized},
-        "char_word_ids": torch.tensor([], dtype=torch.long),
-    }
+    return tokenize_bimodal_efficient("My heart is in the work.", char_tokenizer, word_tokenizer, args)

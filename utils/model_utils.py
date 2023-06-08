@@ -159,6 +159,13 @@ class BaseEstimator(object):
             # prob = ret_step
             self.train_step += 1
             tbar.set_description("train_loss - {:.4f}".format(loss))
+
+            if self.train_step % 5000 == 0:
+                # timestamp = "{}.pt".format(datetime.now().strftime("%m-%d_%H-%M")
+                self.save(os.path.join(
+                    self.cfg.output_dir, self.cfg.ckpt_name)
+            )
+
             if self.writer is not None:
                 self.writer.add_scalar("train/loss", loss, self.train_step)
                 self.writer.add_scalar(
@@ -196,7 +203,8 @@ class BaseEstimator(object):
                 cfg.output_dir, "{}.pt".format(datetime.now().strftime("%m-%d_%H-%M"))
             )
             if cfg.save.lower() == "true":
-                self.save(checkpoint_path)
+                if self.epoch % 20 == 0 :
+                    self.save(checkpoint_path)
             if self.logger is not None:
                 self.logger.info("[CHECKPOINT]\t{}".format(checkpoint_path))
 
@@ -255,34 +263,40 @@ class BaseEstimator(object):
         return results
 
     def save(self, checkpoint_path):
-        if self.epoch % 20 == 0:
-            checkpoint = {
-                "epoch": self.epoch,
-                "train_step": self.train_step,
-                "dev_step": self.dev_step,
-                "test_step": self.test_step,
-                "model": self.model.state_dict(),
-                "optimizer": self.optimizer.state_dict()
-                if self.optimizer is not None
-                else None,
-                "scheduler": self.scheduler.state_dict()
-                if self.scheduler is not None
-                else None,
-            }
-            torch.save(checkpoint, checkpoint_path)
+        checkpoint = {
+            "epoch": self.epoch,
+            "train_step": self.train_step,
+            "dev_step": self.dev_step,
+            "test_step": self.test_step,
+            "model": self.model.state_dict(),
+            "optimizer": self.optimizer.state_dict()
+            if self.optimizer is not None
+            else None,
+            "scheduler": self.scheduler.state_dict()
+            if self.scheduler is not None
+            else None,
+        }
+        torch.save(checkpoint, checkpoint_path)
 
     def load(self, checkpoint_path):
         print("Loading checkpoint {}".format(checkpoint_path))
-        checkpoint = torch.load(checkpoint_path)
+        checkpoint = torch.load(checkpoint_path, map_location=self.cfg.device)
         self.epoch = checkpoint["epoch"]
         self.train_step = checkpoint["train_step"]
         self.dev_step = checkpoint["dev_step"]
         self.test_step = checkpoint["test_step"]
-        self.model.load_state_dict(checkpoint["model"])
-        if self.optimizer is not None:
-            self.optimizer.load_state_dict(checkpoint["optimizer"])
-        else:
-            print("Optimizer is not loaded")
+        new_state_dict = {}
+        for k, v in checkpoint["model"].items():
+            if k.startswith("module."):
+                name = k[7:] # remove `module.`
+                new_state_dict[name] = v
+            else:
+                new_state_dict[k] = v
+        self.model.load_state_dict(new_state_dict)
+        # if self.optimizer is not None:
+        #     self.optimizer.load_state_dict(checkpoint["optimizer"])
+        # else:
+        #     print("Optimizer is not loaded")
         if self.scheduler is not None:
             self.scheduler.load_state_dict(checkpoint["scheduler"])
         else:

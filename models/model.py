@@ -14,6 +14,8 @@ import typing
 from transformers import AutoModel
 import torch.nn.functional as F
 from datasets import load_metric
+import evaluate
+import wandb
 
 from models.info import id2tag, tag2id, encode_tags
 
@@ -869,10 +871,61 @@ class baseline_classifier(BaseEstimator):
                 predictions=true_predictions,
                 references=true_labels,
             )
-            # print(f"{result_}")
+            
             print(f"===== *F1 result: {result_['overall_f1']}======")
 
-        return eval_pred, eval_ys
+        return result_, loss
+
+    def _train_epoch(self, trainloader, devloader=None, testloader=None):
+        self.mode = "train"
+        self.model.train()
+        tbar = tqdm(trainloader, dynamic_ncols=True)
+        for data in tbar:
+            ret_step = self.step(data)
+            loss = ret_step["loss"]
+            #########
+            if "label" in ret_step:
+                y = ret_step["label"]
+            # prob = ret_step
+            self.train_step += 1
+            tbar.set_description("train_loss - {:.4f}".format(loss))
+        if devloader is not None:
+            print("========== dev set evaluation ==========")
+            dev_results, dev_loss = self.dev(devloader)
+        if testloader is not None:
+            print("========== test set evaluation ==========")
+            test_results, test_loss = self.dev(testloader)
+        
+        wandb.log({"dev_f1": dev_results['overall_f1'], 
+                "dev_loss": dev_loss, 
+                'dev_acc': dev_results['overall_accuracy'], 
+                'dev_recall': dev_results['overall_recall'], 
+                'dev_precision': dev_results['overall_precision'],
+                'test_f1': test_results['overall_f1'],
+                "test_loss": test_loss, 
+                'test_acc': test_results['overall_accuracy'], 
+                'test_recall': test_results['overall_recall'], 
+                'test_precision': test_results['overall_precision']})
+        self.dev_f1.append(dev_results['overall_f1'])
+        self.test_f1.append(test_results['overall_f1'])
+
+    def train(self, cfg, trainloader, devloader=None, testloader=None):
+        self.mode = "train"
+        self.dev_f1, self.test_f1 = [], []
+        assert self.optimizer is not None, "Optimizer is required"
+        assert hasattr(cfg, "output_dir"), "Output directory must be specified"
+        make_if_not_exists(cfg.output_dir)
+        for i in range(cfg.n_epochs):
+            print(f"Training epoch {i}")
+            self._train_epoch(trainloader, devloader, testloader)
+            self.epoch += 1
+            checkpoint_path = os.path.join(
+                cfg.output_dir, "{}.pt".format(datetime.now().strftime("%m-%d_%H-%M"))
+            )
+            if self.logger is not None:
+                self.logger.info("[CHECKPOINT]\t{}".format(checkpoint_path))
+        dev_f1_index = np.argmax(np.array(self.dev_f1))
+        print(f"Best dev - test F1: {self.test_f1[dev_f1_index]}")
 
 
 class self_attention(nn.Module):
@@ -1258,6 +1311,56 @@ class co_attention(nn.Module):
         return trm
 
 
+def getPositionEncoding(seq_len, d, n=10000):
+    P = np.zeros((seq_len, d))
+    for k in range(seq_len):
+        for i in np.arange(int(d/2)):
+            denominator = np.power(n, 2*i/d)
+            P[k, 2*i] = np.sin(k/denominator)
+            P[k, 2*i+1] = np.cos(k/denominator)
+    return P
+
+def get_positional_embedding_A(word_positional_embedding, word_ids, args):
+    result = []
+    for ids in word_ids:
+        if ids != -100:
+            result.append(word_positional_embedding[ids])
+        else:
+            result.append([0 for i in range(args.emb_size)])
+    return result
+
+def get_positional_embedding_B(char_positional_embedding, word_ids, args):
+    ## NOTE: this requires further reasoning on correctness
+    result = []
+    current_id = -1
+    for i in range(len(word_ids)):
+        ids = word_ids[i]
+        if ids != -100:
+            if ids != current_id:
+                result.append(char_positional_embedding[i])
+                current_id += 1
+        else:
+            result.append([0 for i in range(args.emb_size)])
+    return result
+
+def get_positional_embedding_C(char_positional_embedding, word_ids, args):
+    ## NOTE: this requires further reasoning on correctness
+    result = []
+    total = []
+    current_id = 0
+    for i in range(len(word_ids)):
+        ids = word_ids[i]
+        if ids != -100:
+            if ids != current_id:
+                result.append(np.mean(np.tensor(total), dim = -1))
+                current_id += 1
+                total = []
+            total.append(char_positional_embedding[i])
+        else:
+            result.append([0 for i in range(args.emb_size)])
+    return result
+
+
 class bimodal_base(nn.Module):
     def __init__(self, model_dict, args):
         super().__init__()
@@ -1269,20 +1372,64 @@ class bimodal_base(nn.Module):
         self.word_co_attention = nn.ModuleList(
             [co_attention(args.emb_size) for i in range(args.num_att_layers)]
         )
+        self.char_lin = nn.Linear(args.emb_size * 2, args.emb_size)
+        self.word_lin = nn.Linear(args.emb_size * 2, args.emb_size)
 
     def forward(self, data):
-        char_data = data["char"]
-        word_data = data["word"]
         char_encoded = self.model_dict["char"](
-            input_ids=char_data["input_ids"].to(self.args.device),
-            attention_mask=char_data["attention_mask"].to(self.args.device),
+            input_ids=data["char_input_ids"].to(self.args.device),
+            attention_mask=data["char_attention_mask"].to(self.args.device),
         )
         word_encoded = self.model_dict["word"](
-            input_ids=word_data["input_ids"].to(self.args.device),
-            attention_mask=word_data["attention_mask"].to(self.args.device),
+            input_ids=data["word_input_ids"].to(self.args.device),
+            attention_mask=data["word_attention_mask"].to(self.args.device),
         )
         char_hidden = char_encoded["last_hidden_state"]
         word_hidden = word_encoded["last_hidden_state"]
+
+        if self.args.add_positional_embedding == "true":
+
+            if self.args.pos_type == "A":
+                word_positional_embedding = [
+                    getPositionEncoding(seq_len = int(word_hidden.shape[1]), d = self.args.emb_size) 
+                    for i in range(int(word_hidden.shape[0]))
+                    ]
+                word_positional_embedding = torch.tensor(word_positional_embedding)
+                char_positional_embedding = [
+                    get_positional_embedding_A(word_positional_embedding[i], data["char_word_ids"][i], self.args) 
+                    for i in range(int(char_hidden.shape[0]))
+                    ]
+                char_positional_embedding = torch.tensor(char_positional_embedding)
+
+            elif self.args.pos_type == "B":
+                char_positional_embedding = [
+                    getPositionEncoding(seq_len = int(char_hidden.shape[1]), d = self.args.emb_size) 
+                    for i in range(int(char_hidden.shape[0]))
+                    ]
+                char_positional_embedding = torch.tensor(char_positional_embedding)
+                word_positional_embedding = [
+                    get_positional_embedding_B(char_positional_embedding[i], data["char_word_ids"][i], self.args) 
+                    for i in range(int(word_hidden.shape[0]))
+                    ]
+                word_positional_embedding = torch.tensor(word_positional_embedding)
+
+            elif self.args.pos_type == "C":
+                char_positional_embedding = [
+                    getPositionEncoding(seq_len = int(char_hidden.shape[1]), d = self.args.emb_size) 
+                    for i in range(int(char_hidden.shape[0]))
+                    ]
+                char_positional_embedding = torch.tensor(char_positional_embedding)
+                word_positional_embedding = [
+                    get_positional_embedding_C(char_positional_embedding[i], data["char_word_ids"][i], self.args) 
+                    for i in range(int(word_hidden.shape[0]))
+                    ]
+                word_positional_embedding = torch.tensor(word_positional_embedding)
+
+
+
+            char_hidden = torch.add(char_hidden, char_positional_embedding)
+            word_hidden = torch.add(word_hidden, word_positional_embedding)
+
         for i in range(self.args.num_att_layers):
             # print(f"-------------- {i} --------------")
             char_new = self.char_co_attention[i](mod1=char_hidden, mod2=word_hidden)
@@ -1290,6 +1437,9 @@ class bimodal_base(nn.Module):
             char_hidden = char_new
             word_hidden = word_new
             # print(f"============== {i} ==============")
+        if self.args.last_layer_integration == "true":
+            char_hidden = self.char_lin(torch.cat((char_hidden, char_encoded["last_hidden_state"]), dim = -1))
+            word_hidden = self.word_lin(torch.cat((word_hidden, word_encoded["last_hidden_state"]), dim = -1))
         return {"char": char_hidden, "word": word_hidden}
 
 
@@ -1297,7 +1447,6 @@ class bimodal_pretrain(nn.Module):
     def __init__(self, base, args):
         super().__init__()
         args.char_vocab_size = args.vocab_size["char"]
-        # args.char_vocab_size = base.model_dict["char"].config.vocab_size
         args.word_vocab_size = base.model_dict["word"].config.vocab_size
         self.base = base
         self.char_mlm_layer = nn.Linear(args.emb_size, args.char_vocab_size)
@@ -1330,23 +1479,29 @@ class bimodal_trainer(BaseEstimator):
             torch.reshape(
                 logits_dict["char"], shape=(-1, logits_dict["char"].shape[-1])
             ),
-            data["char"]["input_ids"].view(-1).to(self.cfg.device),
-        ).to(self.cfg.device)
+            data["char_input_ids"].view(-1).to(self.cfg.device),
+        )
         # [10 * 44 * vocab_size] -> [(10*44) * vocab_size]
         word_mlm_loss = self.criterion(
             torch.reshape(
                 logits_dict["word"], shape=(-1, logits_dict["word"].shape[-1])
             ),
-            data["word"]["input_ids"].view(-1).to(self.cfg.device),
-        ).to(self.cfg.device)
+            data["word_input_ids"].view(-1).to(self.cfg.device),
+        )
         ## TODO: check dimension here
         alignment_loss = self.criterion(
             logits_dict["similarity"], data["char_word_ids"].to(self.cfg.device)
-        ).to(self.cfg.device)
+        )
         ## TODO: weight loss
-        loss = char_mlm_loss + word_mlm_loss + alignment_loss
+        loss = char_mlm_loss + word_mlm_loss # + alignment_loss
+        
+        try:
+            wandb.log({"char_mlm_loss": char_mlm_loss, 'word_mlm_loss': word_mlm_loss, 'alignment_loss': alignment_loss, 'loss': loss })
+        except:
+            print("wandb is not initialized")
+
         if self.mode == "train":
-            # self.args.accelerator.backward(loss)
+            # self.cfg.accelerator.backward(loss)
             loss.backward()
             self.optimizer.step()
             if self.scheduler is not None:
@@ -1355,13 +1510,6 @@ class bimodal_trainer(BaseEstimator):
             self.optimizer.zero_grad()
         elif self.mode in ("dev", "test"):
             pass
-        # for key, val in logits_dict.items():
-        #     logits_dict[key] = val.detach().cpu()
-        # logits_dict["similarity"] = logits_dict["similarity"].detach().cpu()
-        # for key, val in logits_dict["char"].items():
-        #             logits_dict["char"][key] = val.detach().cpu()
-        # for key, val in logits_dict["word"].items():
-        #             logits_dict["word"][key] = val.detach().cpu()
         return {
             "loss": loss.detach().cpu().item(),
             "char_mlm_loss": char_mlm_loss.detach().cpu().item(),
@@ -1420,8 +1568,151 @@ class bimodal_ner(nn.Module):
         return logits
 
 
-class bimodal_classifier(baseline_classifier):
-    print("Bimodal classifier is the same as baseline classfier!")
+class bimodal_classifier(BaseEstimator):
+    def step(self, data):
+        self.optimizer.zero_grad()
+        logits = self.model(data=data)
+        ## softmax the logit before loss!
+        loss = self.criterion(
+            logits.view(-1, self.cfg.num_labels),
+            # data[model][label] -> data[label]
+            data["word_labels"].view(-1).to(self.cfg.device),
+        )
+        if self.mode == "train":
+            # loss = torch.tensor(0.00, requires_grad = True)
+            loss.backward()
+            self.optimizer.step()
+            if self.scheduler is not None:
+                self.scheduler.step()
+            self.optimizer.zero_grad()
+            return {
+                "loss": loss.detach().cpu().item(),
+                "logits": logits.detach().cpu(),  ## softmax this
+                "label": data["word_labels"],
+            }
+        elif self.mode in ("dev", "test"):
+            return {
+                "loss": loss.detach().cpu().item(),
+                "logits": logits.detach().cpu(),  ## softmax this
+                "label": data["word_labels"],
+            }
+
+    def _eval(self, evalloader):
+        self.model.eval()
+        tbar = tqdm(evalloader, dynamic_ncols=True)
+        eval_loss = []
+        ys = []
+        preds = []
+
+        if self.evaluate_metric is None:
+            self.evaluate_metric = dict()
+            self.evaluate_metric["f1"] = evaluate.load("f1")
+            self.evaluate_metric["all"] = load_metric("seqeval")
+
+        for data in tbar:
+            ret_step = self.step(data)  ## y: [bs, seq_len]
+            loss, logits, y = ret_step["loss"], ret_step["logits"], ret_step["label"]
+            pred = torch.argmax(logits, dim=-1)  ## predicted, [bs, seq_len]
+            if self.mode == "dev":
+                # tbar.set_description('dev_loss - {:.4f}'.format(loss))
+                # eval_loss.append(loss)
+                ys.append(y)
+            preds.append(pred)  ## use pred for F1 and change how you append
+       
+        if self.mode == "dev":
+            flatten_ys, flatten_pred = np.array([]), np.array([])
+            for y_ in ys:
+                flatten_ys = np.append(flatten_ys, np.array(y_).ravel())
+            for p_ in preds:
+                flatten_pred = np.append(flatten_pred, np.array(p_).ravel())
+
+            eval_ys, eval_pred = np.array([]), np.array([])
+            for y_, p_ in zip(flatten_ys, flatten_pred):
+                if y_ != -100:
+                    eval_ys = np.append(eval_ys, y_)
+                    eval_pred = np.append(eval_pred, p_)
+
+            results = self.evaluate_metric["f1"].compute(
+                predictions=eval_pred, references=eval_ys, average="macro"
+            )
+            print(f"====== F1 result: {results}======")
+
+            true_predictions = [
+                [
+                    id2tag[p]
+                    for (p, l) in zip(np.array(p_).ravel(), np.array(y_).ravel())
+                    if l != -100
+                ]
+                for p_, y_ in zip(preds, ys)
+            ]
+            true_labels = [
+                [
+                    id2tag[l]
+                    for (p, l) in zip(np.array(p_).ravel(), np.array(y_).ravel())
+                    if l != -100
+                ]
+                for p_, y_ in zip(preds, ys)
+            ]
+
+            result_ = self.evaluate_metric["all"].compute(
+                predictions=true_predictions,
+                references=true_labels,
+            )
+            print(f"===== *F1 result: {result_['overall_f1']}======")
+
+        return result_, loss
+
+    def train(self, cfg, trainloader, devloader=None, testloader=None):
+        self.mode = "train"
+        self.dev_f1, self.test_f1 = [], []
+        assert self.optimizer is not None, "Optimizer is required"
+        assert hasattr(cfg, "output_dir"), "Output directory must be specified"
+        make_if_not_exists(cfg.output_dir)
+        for i in range(cfg.n_epochs):
+            print(f"Training epoch {i}")
+            self._train_epoch(trainloader, devloader, testloader)
+            self.epoch += 1
+            checkpoint_path = os.path.join(
+                cfg.output_dir, "{}.pt".format(datetime.now().strftime("%m-%d_%H-%M"))
+            )
+            if self.logger is not None:
+                self.logger.info("[CHECKPOINT]\t{}".format(checkpoint_path))
+        dev_f1_index = np.argmax(np.array(self.dev_f1))
+        print(f"Best dev - test F1: {self.test_f1[dev_f1_index]}")
+
+
+    def _train_epoch(self, trainloader, devloader=None, testloader=None):
+        self.mode = "train"
+        self.model.train()
+        tbar = tqdm(trainloader, dynamic_ncols=True)
+        for data in tbar:
+            ret_step = self.step(data)
+            loss = ret_step["loss"]
+            #########
+            if "label" in ret_step:
+                y = ret_step["label"]
+            # prob = ret_step
+            self.train_step += 1
+            tbar.set_description("train_loss - {:.4f}".format(loss))
+        if devloader is not None:
+            print("========== dev set evaluation ==========")
+            dev_results, dev_loss = self.dev(devloader)
+        if testloader is not None:
+            print("========== test set evaluation ==========")
+            test_results, test_loss = self.dev(testloader)
+        
+        wandb.log({"dev_f1": dev_results['overall_f1'], 
+                "dev_loss": dev_loss, 
+                'dev_acc': dev_results['overall_accuracy'], 
+                'dev_recall': dev_results['overall_recall'], 
+                'dev_precision': dev_results['overall_precision'],
+                'test_f1': test_results['overall_f1'],
+                "test_loss": test_loss, 
+                'test_acc': test_results['overall_accuracy'], 
+                'test_recall': test_results['overall_recall'], 
+                'test_precision': test_results['overall_precision']})
+        self.dev_f1.append(dev_results['overall_f1'])
+        self.test_f1.append(test_results['overall_f1'])
 
 
 if __name__ == "__main__":

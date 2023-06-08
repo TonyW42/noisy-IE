@@ -2,14 +2,8 @@ import sys
 
 sys.path.append("..")
 sys.path.append("../..")
-from torch.nn.utils.rnn import pad_sequence  # (1)
-from collections import defaultdict
 from transformers import (
-    AutoModel,
     AutoTokenizer,
-    DataCollatorForTokenClassification,
-    get_scheduler,
-    AutoModelForMaskedLM,
 )
 import torch
 from models.model import (
@@ -20,18 +14,21 @@ from data.pre_processing.loader_helper import (
     SSTDatasetMulti,
     WNUTDatasetMulti,
     SSTDatasetMulti,
-    BookWikiDatasetMulti,
 )
 from datasets import load_dataset
 import os
-from datasets import Dataset
+
+# from datasets import Dataset
+from torch.utils.data import Dataset
 from data.pre_processing.collator import (
     custom_collate,
     custom_collate_SST,
     custom_collate_book_wiki_eval,
     custom_collate_book_wiki,
+    custom_collate_book_wiki_wrapper,
 )
 from data.efficient.collator_efficient import (
+    clean_text,
     tokenize_bimodal_efficient_eval,
     tokenize_bimodal_efficient,
 )
@@ -41,7 +38,7 @@ count = 0
 
 
 def fetch_loaders(model_names, args):
-    wnut = load_dataset("wnut_17", cache_dir=args.output_dir)
+    wnut = load_dataset("conll2003", cache_dir=args.output_dir)
     train_encoding_list, train_label_list = [], []
     valid_encoding_list, valid_label_list = [], []
     test_encoding_list, test_label_list = [], []
@@ -311,6 +308,52 @@ def fetch_loader_wnut(args):
     return loader_train, loader_valid, loader_test
 
 
+def fetch_loader_conll2003(args):
+    """
+    To load dataset from bookcorpus and wikitext:
+    - Wikitext: ['wikitext-103-v1', 'wikitext-2-v1', 'wikitext-103-raw-v1', 'wikitext-2-raw-v1'];
+    - WikiText-2 aims to be of a similar size to the PTB while WikiText-103 contains all articles extracted from Wikipedia.
+    """
+
+    """
+    Store dataset in local to save time, 
+    if detected dataset is already downloaded, load from the disk
+    """
+    dataset_wnut = load_dataset("conll2003", cache_dir=args.output_dir)
+
+    word_tokenizer = AutoTokenizer.from_pretrained(
+        args.word_model, cache_dir=args.output_dir, add_prefix_space=True
+    )
+    char_tokenizer = AutoTokenizer.from_pretrained(
+        args.char_model, cache_dir=args.output_dir, add_prefix_space=True
+    )
+    data_train = BookWikiDatasetMulti_efficient_eval(
+        dataset_wnut["train"], char_tokenizer, word_tokenizer, args
+    )
+    data_valid = BookWikiDatasetMulti_efficient_eval(
+        dataset_wnut["validation"], char_tokenizer, word_tokenizer, args
+    )
+    data_test = BookWikiDatasetMulti_efficient_eval(
+        dataset_wnut["test"], char_tokenizer, word_tokenizer, args
+    )
+    loader_train = torch.utils.data.DataLoader(
+        data_train,
+        batch_size=args.train_batch_size,
+        collate_fn=custom_collate_book_wiki_eval,
+    )
+    loader_valid = torch.utils.data.DataLoader(
+        data_valid,
+        batch_size=args.train_batch_size,
+        collate_fn=custom_collate_book_wiki_eval,
+    )
+    loader_test = torch.utils.data.DataLoader(
+        data_test,
+        batch_size=args.train_batch_size,
+        collate_fn=custom_collate_book_wiki_eval,
+    )
+    return loader_train, loader_valid, loader_test
+
+
 def fetch_loader_book_wiki_bimodal(model_names, args):
     """
     To load dataset from bookcorpus and wikitext:
@@ -327,8 +370,6 @@ def fetch_loader_book_wiki_bimodal(model_names, args):
         "wikitext", "wikitext-103-v1", cache_dir=args.output_dir
     )
 
-    # train_encoding_list = []
-
     word_tokenizer = AutoTokenizer.from_pretrained(
         args.word_model, cache_dir=args.output_dir
     )  ## changed here
@@ -336,14 +377,29 @@ def fetch_loader_book_wiki_bimodal(model_names, args):
         args.char_model, cache_dir=args.output_dir
     )
 
+    char_tokenizer.unk_token_id = 256
+    char_tokenizer.cls_token_id = 257
+    char_tokenizer.sep_token_id = 258
+
+    data_full = dataset_wiki["train"]["text"] + dataset_bookcorpus["train"]["text"]
+
+    # data_test = dataset_wiki["train"]["text"][: int(len(dataset_wiki["train"]["text"]) * 0.08)] + \
+    #     dataset_bookcorpus["train"]["text"][: int(len(dataset_bookcorpus["train"]["text"]) * 0.08)]
+    data_test = data_full[: 500]
+
     data_train = BookWikiDatasetMulti_efficient(
-        dataset_wiki["train"]["text"], char_tokenizer, word_tokenizer, args
+        data_full[: len(data_full)],
+        # data_test,
+        char_tokenizer,
+        word_tokenizer,
+        args,
     )
+
     loader_train = torch.utils.data.DataLoader(
         data_train,
         batch_size=args.train_batch_size,
-        sampler = RandomSampler(data_train),
-        collate_fn=custom_collate_book_wiki,
+        shuffle=True,
+        collate_fn=custom_collate_book_wiki_wrapper,
     )
     return loader_train, None, None
 

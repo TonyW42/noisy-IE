@@ -2,35 +2,24 @@ import sys
 
 sys.path.append("..")
 sys.path.append("../..")
-import transformers
-from transformers import AutoModel, AutoTokenizer, DataCollatorForTokenClassification
 import torch
-from torch import nn, optim
-from datasets import load_dataset
-from sklearn.metrics import roc_auc_score, precision_recall_fscore_support
 
 import numpy as np
 import pandas as pd
-import random
 
 import os
 import argparse
-from datetime import datetime
 from classifier import *
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
 
-# from model import my_model
-# from utils import classifier, setup_seed, make_if_not_exists
-# from data import prepare_data
-from torch.utils.data import DataLoader
 from utils.utils import setup_seed
-from transformers import AutoModelForTokenClassification, TrainingArguments, Trainer
 from evaluate_utils import *
 
 ## use GPU is available
 
 from models.default_model import *
+from evaluate_classifier import *
 
 
 if __name__ == "__main__":
@@ -68,11 +57,17 @@ if __name__ == "__main__":
     parser.add_argument("--save", type=str, default="true")
     parser.add_argument("--layer_type", type=str, default="att")
     parser.add_argument("--mlm_epochs", type=int, default=100)
+    parser.add_argument("--model_type", type=str, default="base")
 
     ## NOTE: newly added
     parser.add_argument("--emb_size", type=int, default=768)
     parser.add_argument("--char_model", type=str, default="google/canine-s")
     parser.add_argument("--n_workers", type=int, default=8)
+    parser.add_argument("--group_name", type=str, default="default")
+    parser.add_argument("--freeze_parameters", type=str, default="false")
+
+    parser.add_argument("--add_positional_embedding", type=str, default="false")
+    parser.add_argument("--pos_type", type=str, default="none")
 
     parser.add_argument(
         "--granularities_model",
@@ -83,6 +78,7 @@ if __name__ == "__main__":
             "subword_30k": "bert-base-cased",
         },
     )
+    parser.add_argument("--last_layer_integration", type=str, default="false")
 
     parser.add_argument("--test", type=bool, default=False)
     parser.add_argument(
@@ -103,17 +99,21 @@ if __name__ == "__main__":
         },
     )
 
+    parser.add_argument("--ckpt_name", type=str, default="MLM_model.pt")
+
     args = parser.parse_args()
     args.granularities = args.granularities.split(",")
     args.train = True if args.mode == "True" else False
     # args.model_names = [args.granularities_model[key] for key in args.granularities_model]
     args.model_names = args.model_list.split("|")
     # args.vocab_size = {'char': 1114112}
-    args.vocab_size = {"char": 258}
+    args.vocab_size = {"char": 259}
 
     if not args.device:
         if torch.cuda.is_available():
             args.device = "cuda"
+        # elif torch.backends.mps.is_available():
+        #     args.device = "mps"
         else:
             args.device = "cpu"
 
@@ -133,5 +133,11 @@ if __name__ == "__main__":
         train_MLM_corpus(args)
     elif args.expr == "mlm_b":
         train_bimodal_MLM(args, args.test)
+    elif args.expr == "eval_wnut":
+        wnut_bimodal_MLM(args)
+    elif args.expr == "mlmori":
+        train_bimodal_MLM_seq(args, args.test)
+    elif "tweeteval" in args.expr:
+        train_classification_model(args)
     else:
         train(args)
