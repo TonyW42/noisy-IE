@@ -41,6 +41,29 @@ def process_wnut_2020_task2(data_dir):
         result.append(result_tmp)
     return result
 
+def process_semeval18_task1(data):
+    emotions = [
+        "anger", 
+        "anticipation",
+        "disgust",
+        "fear", 
+        "joy",
+        "love",
+        "optimism",
+        "pessimism",
+        "sadness",
+        "surprise",
+        "trust"
+        ]
+    data = data.rename_column("Tweet", "text")
+    label = []
+    for i in range(len(data)):
+        label_sample = [1 for emo in emotions if data[i][emo] else 0]
+        label.append(label_sample)
+    data.add_column("label", label)
+    return data
+
+
 def fetch_classification_loader(dataset_name, char_tokenizer, word_tokenizer):
     data = None ## TODO: add data 
     if "tweeteval" in dataset_name:
@@ -53,6 +76,11 @@ def fetch_classification_loader(dataset_name, char_tokenizer, word_tokenizer):
         train_split = process_wnut_2020_task2("data/wnut20_task2/train.tsv")
         val_split = process_wnut_2020_task2("data/wnut20_task2/valid.tsv")
         test_split = process_wnut_2020_task2("data/wnut20_task2/test.tsv")
+    if dataset_name == "semeval18_task1":
+        data = load_dataset("sem_eval_2018_task_1", "subtask5.english")
+        train_split = process_semeval18_task1(data["train"])
+        val_split = process_semeval18_task1(data["validation"])
+        test_split = process_semeval18_task1(data["test"])
         
 
     train_dataset = classification_dataset(train_split, char_tokenizer, word_tokenizer, args)
@@ -83,6 +111,45 @@ class model_for_classificaton(nn.Module):
         
 
 class classification_trainer(BaseEstimator):
+    def setp(self, data):
+        logits = self.model(data=data)
+        loss = self.criterion(logits, data["label"].to(self.device))
+        if self.mode == "train":
+            # self.args.accelerator.backward(loss)
+            loss.backward()
+            self.optimizer.step()
+            if self.scheduler is not None:
+                self.scheduler.step()
+        return {
+            "loss": loss.detach().cpu().item(),
+            "logits": logits.detach().cpu()
+        }
+    
+    def _eval(self, evalloader):
+        self.model.eval()
+        tbar = tqdm(evalloader, dynamic_ncols=True)
+        labels, preds = [], []
+
+        f1_metric = evaluate.load("f1")
+        acc_metric = evaluate.load("accuracy")
+        precision_metric = evaluate.load("precision")
+        recall_metric = evaluate.load("recall")
+
+        for data in tbar:
+            ret_step = self.step(data) 
+            loss, logits, label = ret_step["loss"], ret_step["logits"], data["label"]
+            pred = torch.argmax(logits, dim = -1)
+            labels.extend(label.tolist())
+            preds.extend(pred.toist())
+        
+        f1 = f1_metric(predictions = preds, references = labels)
+        acc = acc_metric(predictions = preds, references = labels)
+        precision = precision_metric(predictions = preds, references = labels)
+        recall = recall_metric(predictions = preds, references = labels)
+
+        # TODO: add these to W and B!
+
+class multi_classification_trainer(BaseEstimator):
     def setp(self, data):
         logits = self.model(data=data)
         loss = self.criterion(logits, data["label"].to(self.device))
