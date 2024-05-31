@@ -1,7 +1,10 @@
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-# noisy-IE
-Noisy-IE is a research project that combines multi-level models for Noisy Information Extraction. 
+# Learning Mutually Informed Representations for Characters and Subwords
+In this paper, we propose the entanglement model, which can be used for character-level, subword-level, and sequence-level tasks. 
+
+Our paper will appear in NAACL findings 2024! Here is the [link](https://arxiv.org/abs/2311.07853) to our paper. 
+
 
 # Installation
 ## Requirements
